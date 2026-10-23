@@ -8,7 +8,7 @@ async function index(req, res) {
 }
 
 async function show(req, res) {
-  reply.success(res, await announcementService.getAnnouncement(req.params.id));
+  reply.ok(res, await announcementService.getAnnouncement(req.params.id));
 }
 
 async function store(req, res) {
@@ -16,16 +16,16 @@ async function store(req, res) {
 }
 
 async function replace(req, res) {
-  reply.success(res, await announcementService.replaceAnnouncement(req.params.id, req.body));
+  reply.ok(res, await announcementService.replaceAnnouncement(req.params.id, req.body));
 }
 
 async function update(req, res) {
-  reply.success(res, await announcementService.updateAnnouncement(req.params.id, req.body));
+  reply.ok(res, await announcementService.updateAnnouncement(req.params.id, req.body));
 }
 
 async function destroy(req, res) {
   const item = await announcementService.deleteAnnouncement(req.params.id);
-  reply.success(res, { id: item.id, deleted: true });
+  reply.ok(res, { id: item.id, deleted: true });
 }
 
 module.exports = { index, show, store, replace, update, destroy };

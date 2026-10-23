@@ -24,21 +24,21 @@ after(closeDatabase);
 describe('GET /api/users', () => {
   it('lists the seeded users with a count', async () => {
     const res = await request(app).get('/api/users').expect(200);
-    assert.equal(res.body.success, true);
-    assert.equal(res.body.count, 4);
-    assert.equal(res.body.data.length, 4);
+    assert.ok(Array.isArray(res.body));
+    assert.equal(res.body.length, 4);
+    assert.equal(res.headers['x-total-count'], '4');
   });
 
   it('filters by role', async () => {
     const res = await request(app).get('/api/users?role=student').expect(200);
-    assert.ok(res.body.data.length > 0);
-    assert.ok(res.body.data.every((user) => user.role === 'student'));
+    assert.ok(res.body.length > 0);
+    assert.ok(res.body.every((user) => user.role === 'student'));
   });
 
   it('searches by name or email', async () => {
     const res = await request(app).get('/api/users?search=elif').expect(200);
-    assert.equal(res.body.count, 1);
-    assert.equal(res.body.data[0].id, SEEDED_ID);
+    assert.equal(res.body.length, 1);
+    assert.equal(res.body[0].id, SEEDED_ID);
   });
 
   it('rejects an unknown role filter', async () => {
@@ -49,24 +49,24 @@ describe('GET /api/users', () => {
 describe('GET /api/users/:id', () => {
   it('returns a single user', async () => {
     const res = await request(app).get(`/api/users/${SEEDED_ID}`).expect(200);
-    assert.equal(res.body.data.email, 'elif.yilmaz@alumni.example.edu');
+    assert.equal(res.body.email, 'elif.yilmaz@alumni.example.edu');
   });
 
   it('returns 404 for an unknown id', async () => {
     const res = await request(app).get(`/api/users/${MISSING_ID}`).expect(404);
-    assert.equal(res.body.success, false);
+    assert.equal(typeof res.body.error, 'string');
   });
 });
 
 describe('POST /api/users', () => {
   it('creates a user and returns 201', async () => {
     const res = await request(app).post('/api/users').send(newUser()).expect(201);
-    assert.match(res.body.data.id, /^[0-9a-f-]{36}$/);
-    assert.equal(res.body.data.name, 'Zeynep Arslan');
-    assert.ok(res.body.data.createdAt);
+    assert.match(res.body.id, /^[0-9a-f-]{36}$/);
+    assert.equal(res.body.name, 'Zeynep Arslan');
+    assert.ok(res.body.createdAt);
 
     const list = await request(app).get('/api/users').expect(200);
-    assert.equal(list.body.count, 5);
+    assert.equal(list.body.length, 5);
   });
 
   it('trims strings, lower-cases the email and defaults the role', async () => {
@@ -74,14 +74,14 @@ describe('POST /api/users', () => {
       .post('/api/users')
       .send({ name: '  Deniz Ak ', email: 'Deniz.AK@Example.EDU' })
       .expect(201);
-    assert.equal(res.body.data.name, 'Deniz Ak');
-    assert.equal(res.body.data.email, 'deniz.ak@example.edu');
-    assert.equal(res.body.data.role, 'alumni');
+    assert.equal(res.body.name, 'Deniz Ak');
+    assert.equal(res.body.email, 'deniz.ak@example.edu');
+    assert.equal(res.body.role, 'alumni');
   });
 
   it('returns 400 with field details when required fields are missing', async () => {
     const res = await request(app).post('/api/users').send({}).expect(400);
-    const fields = res.body.error.details.map((detail) => detail.field);
+    const fields = res.body.details.map((detail) => detail.field);
     assert.deepEqual(fields.sort(), ['email', 'name']);
   });
 
@@ -97,7 +97,7 @@ describe('POST /api/users', () => {
       .set('Content-Type', 'application/json')
       .send('{"name": ')
       .expect(400);
-    assert.match(res.body.error.message, /JSON/);
+    assert.match(res.body.message, /JSON/);
   });
 
   it('returns 409 when the email is already taken (case-insensitive)', async () => {
@@ -114,9 +114,9 @@ describe('PUT /api/users/:id', () => {
       .put(`/api/users/${SEEDED_ID}`)
       .send(newUser({ email: 'elif.new@alumni.example.edu' }))
       .expect(200);
-    assert.equal(res.body.data.id, SEEDED_ID);
-    assert.equal(res.body.data.name, 'Zeynep Arslan');
-    assert.equal(res.body.data.email, 'elif.new@alumni.example.edu');
+    assert.equal(res.body.id, SEEDED_ID);
+    assert.equal(res.body.name, 'Zeynep Arslan');
+    assert.equal(res.body.email, 'elif.new@alumni.example.edu');
   });
 
   it('requires all mandatory fields', async () => {
@@ -131,8 +131,8 @@ describe('PUT /api/users/:id', () => {
 describe('PATCH /api/users/:id', () => {
   it('updates only the given fields', async () => {
     const res = await request(app).patch(`/api/users/${SEEDED_ID}`).send({ role: 'faculty' }).expect(200);
-    assert.equal(res.body.data.role, 'faculty');
-    assert.equal(res.body.data.name, 'Elif Yılmaz');
+    assert.equal(res.body.role, 'faculty');
+    assert.equal(res.body.name, 'Elif Yılmaz');
   });
 
   it('returns 400 when nothing updatable is sent', async () => {
@@ -150,7 +150,7 @@ describe('PATCH /api/users/:id', () => {
 describe('DELETE /api/users/:id', () => {
   it('deletes the user', async () => {
     const res = await request(app).delete(`/api/users/${SEEDED_ID}`).expect(200);
-    assert.deepEqual(res.body.data, { id: SEEDED_ID, deleted: true });
+    assert.deepEqual(res.body, { id: SEEDED_ID, deleted: true });
     await request(app).get(`/api/users/${SEEDED_ID}`).expect(404);
   });
 

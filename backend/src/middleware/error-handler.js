@@ -37,8 +37,6 @@ function errorHandler(err, req, res, next) {
   if (wantsHtml(req)) {
     return res.status(status).render('error', { title: `${status}`, status, message });
   }
-  // a few responses have a body fixed by the specification (see HttpError.responseBody)
-  if (err.responseBody) return res.status(status).json(err.responseBody);
   return failure(res, status, message, details);
 }
 

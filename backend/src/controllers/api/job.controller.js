@@ -9,7 +9,7 @@ async function index(req, res) {
 }
 
 async function show(req, res) {
-  reply.success(res, await jobService.getJob(req.params.id));
+  reply.ok(res, await jobService.getJob(req.params.id));
 }
 
 async function store(req, res) {
@@ -17,16 +17,16 @@ async function store(req, res) {
 }
 
 async function replace(req, res) {
-  reply.success(res, await jobService.replaceJob(req.params.id, req.body));
+  reply.ok(res, await jobService.replaceJob(req.params.id, req.body));
 }
 
 async function update(req, res) {
-  reply.success(res, await jobService.updateJob(req.params.id, req.body));
+  reply.ok(res, await jobService.updateJob(req.params.id, req.body));
 }
 
 async function destroy(req, res) {
   const job = await jobService.deleteJob(req.params.id);
-  reply.success(res, { id: job.id, deleted: true });
+  reply.ok(res, { id: job.id, deleted: true });
 }
 
 // GET /api/users/:id/jobs

@@ -11,7 +11,7 @@ async function index(req, res) {
 }
 
 async function show(req, res) {
-  reply.success(res, await userService.getUser(req.params.id));
+  reply.ok(res, await userService.getUser(req.params.id));
 }
 
 async function store(req, res) {
@@ -19,16 +19,16 @@ async function store(req, res) {
 }
 
 async function replace(req, res) {
-  reply.success(res, await userService.replaceUser(req.params.id, req.body));
+  reply.ok(res, await userService.replaceUser(req.params.id, req.body));
 }
 
 async function update(req, res) {
-  reply.success(res, await userService.updateUser(req.params.id, req.body));
+  reply.ok(res, await userService.updateUser(req.params.id, req.body));
 }
 
 async function destroy(req, res) {
   const user = await userService.deleteUser(req.params.id);
-  reply.success(res, { id: user.id, deleted: true });
+  reply.ok(res, { id: user.id, deleted: true });
 }
 
 module.exports = { index, show, store, replace, update, destroy };

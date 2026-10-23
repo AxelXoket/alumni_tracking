@@ -127,13 +127,10 @@
     return data;
   }
 
+  // API errors look like { error, message, details?: [{ field, message }] }
   function describeError(payload, status) {
-    if (payload && payload.error && typeof payload.error === 'object') {
-      const details = payload.error.details;
-      if (Array.isArray(details) && details.length) {
-        return details.map(function (d) { return d.message; }).join(', ');
-      }
-      if (payload.error.message) return payload.error.message;
+    if (payload && Array.isArray(payload.details) && payload.details.length) {
+      return payload.details.map(function (d) { return d.message; }).join(', ');
     }
     if (payload && payload.message) return payload.message;
     return 'Request failed (HTTP ' + status + ')';

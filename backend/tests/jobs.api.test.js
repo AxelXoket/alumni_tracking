@@ -27,8 +27,8 @@ after(closeDatabase);
 describe('job posting factory', () => {
   it('seeds the sample jobs, each posted by an existing user', async () => {
     const res = await request(app).get('/api/jobs').expect(200);
-    assert.equal(res.body.count, jobPostingFactory.SAMPLE_JOBS.length);
-    assert.ok(res.body.data.every((job) => job.postedBy && job.postedBy.name));
+    assert.equal(res.body.length, jobPostingFactory.SAMPLE_JOBS.length);
+    assert.ok(res.body.every((job) => job.postedBy && job.postedBy.name));
   });
 
   it('build() returns defaults that can be overridden', () => {
@@ -47,9 +47,9 @@ describe('job posting factory', () => {
 describe('POST /api/users/:id/jobs (nested, one-to-many)', () => {
   it('creates a job for the user in the URL', async () => {
     const res = await request(app).post(`/api/users/${ELIF}/jobs`).send(jobPayload()).expect(201);
-    assert.equal(res.body.data.userId, ELIF);
-    assert.equal(res.body.data.postedBy.name, 'Elif Yılmaz');
-    assert.equal(res.body.data.workMode, 'remote');
+    assert.equal(res.body.userId, ELIF);
+    assert.equal(res.body.postedBy.name, 'Elif Yılmaz');
+    assert.equal(res.body.workMode, 'remote');
   });
 
   it('ignores a userId sent in the body: the poster comes from the URL only', async () => {
@@ -57,7 +57,7 @@ describe('POST /api/users/:id/jobs (nested, one-to-many)', () => {
       .post(`/api/users/${ELIF}/jobs`)
       .send(jobPayload({ userId: MERT, user_id: MERT }))
       .expect(201);
-    assert.equal(res.body.data.userId, ELIF);
+    assert.equal(res.body.userId, ELIF);
   });
 
   it('returns 404 when the user does not exist', async () => {
@@ -69,7 +69,7 @@ describe('POST /api/users/:id/jobs (nested, one-to-many)', () => {
       .post(`/api/users/${ELIF}/jobs`)
       .send({ title: '', company: 'X', workMode: 'mars' })
       .expect(400);
-    const fields = res.body.error.details.map((detail) => detail.field).sort();
+    const fields = res.body.details.map((detail) => detail.field).sort();
     assert.deepEqual(fields, ['company', 'title', 'workMode']);
   });
 });
@@ -78,8 +78,8 @@ describe('GET /api/users/:id/jobs', () => {
   it('lists only the jobs of that user', async () => {
     await request(app).post(`/api/users/${ELIF}/jobs`).send(jobPayload()).expect(201);
     const res = await request(app).get(`/api/users/${ELIF}/jobs`).expect(200);
-    assert.ok(res.body.count >= 2);
-    assert.ok(res.body.data.every((job) => job.userId === ELIF));
+    assert.ok(res.body.length >= 2);
+    assert.ok(res.body.every((job) => job.userId === ELIF));
   });
 
   it('returns 404 for an unknown user', async () => {
@@ -90,9 +90,9 @@ describe('GET /api/users/:id/jobs', () => {
 describe('/api/jobs', () => {
   it('filters by work mode and search', async () => {
     const remote = await request(app).get('/api/jobs?workMode=remote').expect(200);
-    assert.ok(remote.body.data.every((job) => job.workMode === 'remote'));
+    assert.ok(remote.body.every((job) => job.workMode === 'remote'));
     const search = await request(app).get('/api/jobs?search=flutter').expect(200);
-    assert.equal(search.body.count, 1);
+    assert.equal(search.body.length, 1);
     await request(app).get('/api/jobs?workMode=space').expect(400);
   });
 
@@ -100,12 +100,12 @@ describe('/api/jobs', () => {
     await request(app).post('/api/jobs').send(jobPayload()).expect(400);
     await request(app).post('/api/jobs').send(jobPayload({ userId: MISSING_ID })).expect(404);
     const res = await request(app).post('/api/jobs').send(jobPayload({ userId: MERT })).expect(201);
-    assert.equal(res.body.data.userId, MERT);
+    assert.equal(res.body.userId, MERT);
   });
 
   it('GET, PUT, PATCH and DELETE a job', async () => {
     const created = await request(app).post(`/api/users/${ELIF}/jobs`).send(jobPayload()).expect(201);
-    const id = created.body.data.id;
+    const id = created.body.id;
 
     await request(app).get(`/api/jobs/${id}`).expect(200);
 
@@ -113,13 +113,13 @@ describe('/api/jobs', () => {
       .put(`/api/jobs/${id}`)
       .send(jobPayload({ title: 'Senior QA Engineer', location: null }))
       .expect(200);
-    assert.equal(replaced.body.data.title, 'Senior QA Engineer');
-    assert.equal(replaced.body.data.location, null);
-    assert.equal(replaced.body.data.userId, ELIF);
+    assert.equal(replaced.body.title, 'Senior QA Engineer');
+    assert.equal(replaced.body.location, null);
+    assert.equal(replaced.body.userId, ELIF);
 
     const patched = await request(app).patch(`/api/jobs/${id}`).send({ workMode: 'hybrid' }).expect(200);
-    assert.equal(patched.body.data.workMode, 'hybrid');
-    assert.equal(patched.body.data.title, 'Senior QA Engineer');
+    assert.equal(patched.body.workMode, 'hybrid');
+    assert.equal(patched.body.title, 'Senior QA Engineer');
 
     await request(app).delete(`/api/jobs/${id}`).expect(200);
     await request(app).get(`/api/jobs/${id}`).expect(404);
@@ -136,6 +136,6 @@ describe('/api/jobs', () => {
   it('deleting a user also deletes the jobs they posted (ON DELETE CASCADE)', async () => {
     const created = await request(app).post(`/api/users/${MERT}/jobs`).send(jobPayload()).expect(201);
     await request(app).delete(`/api/users/${MERT}`).expect(200);
-    await request(app).get(`/api/jobs/${created.body.data.id}`).expect(404);
+    await request(app).get(`/api/jobs/${created.body.id}`).expect(404);
   });
 });

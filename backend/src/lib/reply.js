@@ -1,24 +1,32 @@
+const { STATUS_CODES } = require('http');
+
 /**
- * Every JSON response uses the same envelope:
- *   success -> { success: true, data, ...meta }
- *   failure -> { success: false, error: { status, message, details? } }
+ * JSON response helpers.
+ *
+ * Success responses are the plain resource: a list endpoint returns a JSON
+ * array, a single-item endpoint returns the object. List sizes are also sent
+ * in the X-Total-Count header.
+ *
+ * Errors share one flat shape:
+ *   { error: "<HTTP reason phrase>", message: "...", details?: [{ field, message }] }
  */
-function success(res, data, { status = 200, meta } = {}) {
-  return res.status(status).json({ success: true, ...meta, data });
+function ok(res, data, status = 200) {
+  return res.status(status).json(data);
 }
 
 function list(res, items) {
-  return success(res, items, { meta: { count: items.length } });
+  res.set('X-Total-Count', String(items.length));
+  return ok(res, items);
 }
 
 function created(res, data) {
-  return success(res, data, { status: 201 });
+  return ok(res, data, 201);
 }
 
 function failure(res, status, message, details) {
-  const error = { status, message };
-  if (details !== undefined) error.details = details;
-  return res.status(status).json({ success: false, error });
+  const body = { error: STATUS_CODES[status] || 'Error', message };
+  if (details !== undefined) body.details = details;
+  return res.status(status).json(body);
 }
 
-module.exports = { success, list, created, failure };
+module.exports = { ok, list, created, failure };

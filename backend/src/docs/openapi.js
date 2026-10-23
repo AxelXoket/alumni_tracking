@@ -6,20 +6,17 @@
 
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
 
-const envelope = (dataSchema, extra = {}) => ({
-  type: 'object',
-  properties: { success: { type: 'boolean', example: true }, ...extra, data: dataSchema },
-});
-
 const json = (schema) => ({ content: { 'application/json': { schema } } });
 
 const errorResponse = (description) => ({ description, ...json(ref('Error')) });
 
-const ok = (description, schema) => ({ description, ...json(envelope(schema)) });
+const ok = (description, schema) => ({ description, ...json(schema) });
 
+// list endpoints return a plain JSON array and the size in X-Total-Count
 const listOk = (description, itemSchema) => ({
   description,
-  ...json(envelope({ type: 'array', items: itemSchema }, { count: { type: 'integer' } })),
+  headers: { 'X-Total-Count': { description: 'Number of items in the list', schema: { type: 'integer' } } },
+  ...json({ type: 'array', items: itemSchema }),
 });
 
 const idParam = (description) => ({
@@ -229,7 +226,7 @@ module.exports = {
     title: 'Alumni Tracking System API',
     version: '0.6.0',
     description:
-      'REST API of the Alumni Tracking System course project. Every response uses the `{ success, data }` envelope; errors use `{ success: false, error }`.',
+      'REST API of the Alumni Tracking System course project. List endpoints return plain JSON arrays (size in the `X-Total-Count` header) and single resources return plain objects. Errors use `{ error, message, details? }`.',
   },
   servers: [{ url: '/', description: 'Current host' }],
   tags: [
@@ -327,17 +324,11 @@ module.exports = {
       Error: {
         type: 'object',
         properties: {
-          success: { type: 'boolean', example: false },
-          error: {
-            type: 'object',
-            properties: {
-              status: { type: 'integer', example: 400 },
-              message: { type: 'string', example: 'Validation failed' },
-              details: {
-                type: 'array',
-                items: { type: 'object', properties: { field: { type: 'string' }, message: { type: 'string' } } },
-              },
-            },
+          error: { type: 'string', example: 'Bad Request', description: 'HTTP reason phrase' },
+          message: { type: 'string', example: 'Validation failed' },
+          details: {
+            type: 'array',
+            items: { type: 'object', properties: { field: { type: 'string' }, message: { type: 'string' } } },
           },
         },
       },

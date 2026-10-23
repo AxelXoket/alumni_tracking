@@ -115,7 +115,7 @@ setting.
     │   │   ├── seeds/        # idempotent SQL sample data
     │   │   └── factories/    # job posting + application factories (build / create / seed)
     │   ├── docs/openapi.js   # OpenAPI 3 document
-    │   ├── lib/              # HttpError, response envelope, validator, form helpers
+    │   ├── lib/              # HttpError, JSON response helpers, validator, form helpers
     │   ├── middleware/       # 404 and error handlers
     │   ├── models/           # data models (PostgreSQL)
     │   ├── routes/
@@ -139,7 +139,7 @@ live in one place.
           GET /users (HTML)            GET /api/users (JSON)
                  │                             │
      controllers/web/user.controller   controllers/api/user.controller
-     renders views/users/*.ejs         sends { success, data }
+     renders views/users/*.ejs         sends plain JSON
                  └──────────────┬──────────────┘
                      services/user.service
                  (validation, unique email → 409)
@@ -171,12 +171,19 @@ Errors are thrown as `HttpError` and formatted in one place
 
 ## API
 
-All JSON responses share one envelope:
+Responses are plain JSON, with no wrapper object:
+
+- **List endpoints** return a JSON array, e.g. `GET /api/users` → `[ { ... }, { ... } ]`.
+  The number of items is also sent in the `X-Total-Count` header.
+- **Single resources** return the object itself, e.g. `GET /api/users/:id` → `{ "id": "...", "name": "...", ... }`.
+- **Deletes** return `{ "id": "...", "deleted": true }`.
+- **Errors** share one flat shape: `error` is the HTTP reason phrase, and
+  `details` lists the invalid fields when validation fails.
 
 ```json
-{ "success": true, "data": { } }
-{ "success": true, "count": 4, "data": [ ] }
-{ "success": false, "error": { "status": 400, "message": "Validation failed", "details": [ { "field": "email", "message": "email is required" } ] } }
+{ "error": "Bad Request", "message": "Validation failed", "details": [ { "field": "email", "message": "email is required" } ] }
+{ "error": "Not Found", "message": "User 00000000-0000-4000-8000-000000000000 not found" }
+{ "error": "Conflict", "message": "User has already applied for this job posting" }
 ```
 
 ### System
@@ -189,10 +196,10 @@ All JSON responses share one envelope:
 
 ```bash
 curl http://localhost:3000/hello/Cagri
-# {"success":true,"data":{"name":"Cagri","message":"Hello, Cagri! Welcome to the Alumni Tracking System."}}
+# {"name":"Cagri","message":"Hello, Cagri! Welcome to the Alumni Tracking System."}
 
 curl http://localhost:3000/sum/15/27
-# {"success":true,"data":{"operation":"sum","number1":15,"number2":27,"result":42}}
+# {"operation":"sum","number1":15,"number2":27,"result":42}
 ```
 
 ### Users

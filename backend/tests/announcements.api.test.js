@@ -24,23 +24,23 @@ after(closeDatabase);
 describe('GET /api/announcements', () => {
   it('lists announcements, newest first', async () => {
     const res = await request(app).get('/api/announcements').expect(200);
-    assert.equal(res.body.count, 4);
-    const dates = res.body.data.map((item) => item.createdAt);
+    assert.equal(res.body.length, 4);
+    const dates = res.body.map((item) => item.createdAt);
     assert.deepEqual(dates, [...dates].sort().reverse());
   });
 
   it('filters by category and priority', async () => {
     const byCategory = await request(app).get('/api/announcements?category=career').expect(200);
-    assert.ok(byCategory.body.data.every((item) => item.category === 'career'));
+    assert.ok(byCategory.body.every((item) => item.category === 'career'));
 
     const byPriority = await request(app).get('/api/announcements?priority=high').expect(200);
-    assert.ok(byPriority.body.data.length > 0);
-    assert.ok(byPriority.body.data.every((item) => item.priority === 'high'));
+    assert.ok(byPriority.body.length > 0);
+    assert.ok(byPriority.body.every((item) => item.priority === 'high'));
   });
 
   it('searches title, content and author', async () => {
     const res = await request(app).get('/api/announcements?search=library').expect(200);
-    assert.equal(res.body.count, 1);
+    assert.equal(res.body.length, 1);
   });
 
   it('rejects unknown filter values', async () => {
@@ -52,7 +52,7 @@ describe('GET /api/announcements', () => {
 describe('GET /api/announcements/:id', () => {
   it('returns one announcement', async () => {
     const res = await request(app).get(`/api/announcements/${SEEDED_ID}`).expect(200);
-    assert.equal(res.body.data.title, 'Spring Graduate Reunion 2026');
+    assert.equal(res.body.title, 'Spring Graduate Reunion 2026');
   });
 
   it('returns 404 for an unknown id', async () => {
@@ -63,15 +63,15 @@ describe('GET /api/announcements/:id', () => {
 describe('POST /api/announcements', () => {
   it('creates an announcement', async () => {
     const res = await request(app).post('/api/announcements').send(payload()).expect(201);
-    assert.ok(res.body.data.id);
-    assert.equal(res.body.data.priority, 'high');
+    assert.ok(res.body.id);
+    assert.equal(res.body.priority, 'high');
     const list = await request(app).get('/api/announcements').expect(200);
-    assert.equal(list.body.data[0].id, res.body.data.id);
+    assert.equal(list.body[0].id, res.body.id);
   });
 
   it('defaults the priority to normal', async () => {
     const res = await request(app).post('/api/announcements').send(payload({ priority: undefined })).expect(201);
-    assert.equal(res.body.data.priority, 'normal');
+    assert.equal(res.body.priority, 'normal');
   });
 
   it('accepts enum values in any case', async () => {
@@ -79,8 +79,8 @@ describe('POST /api/announcements', () => {
       .post('/api/announcements')
       .send(payload({ category: 'EVENT', priority: 'Low' }))
       .expect(201);
-    assert.equal(res.body.data.category, 'event');
-    assert.equal(res.body.data.priority, 'low');
+    assert.equal(res.body.category, 'event');
+    assert.equal(res.body.priority, 'low');
   });
 
   it('returns 400 with details for invalid input', async () => {
@@ -88,7 +88,7 @@ describe('POST /api/announcements', () => {
       .post('/api/announcements')
       .send({ title: 'Hi', content: 'short', category: 'sports', priority: 'urgent' })
       .expect(400);
-    const fields = res.body.error.details.map((detail) => detail.field).sort();
+    const fields = res.body.details.map((detail) => detail.field).sort();
     assert.deepEqual(fields, ['author', 'category', 'content', 'priority', 'title']);
   });
 });
@@ -99,8 +99,8 @@ describe('PUT / PATCH /api/announcements/:id', () => {
       .put(`/api/announcements/${SEEDED_ID}`)
       .send(payload({ title: 'Reunion moved to June' }))
       .expect(200);
-    assert.equal(res.body.data.title, 'Reunion moved to June');
-    assert.equal(res.body.data.category, 'career');
+    assert.equal(res.body.title, 'Reunion moved to June');
+    assert.equal(res.body.category, 'career');
   });
 
   it('PUT requires every mandatory field', async () => {
@@ -109,8 +109,8 @@ describe('PUT / PATCH /api/announcements/:id', () => {
 
   it('PATCH updates selected fields only', async () => {
     const res = await request(app).patch(`/api/announcements/${SEEDED_ID}`).send({ priority: 'low' }).expect(200);
-    assert.equal(res.body.data.priority, 'low');
-    assert.equal(res.body.data.title, 'Spring Graduate Reunion 2026');
+    assert.equal(res.body.priority, 'low');
+    assert.equal(res.body.title, 'Spring Graduate Reunion 2026');
   });
 
   it('returns 404 for unknown ids', async () => {

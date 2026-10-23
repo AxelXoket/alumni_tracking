@@ -23,14 +23,12 @@ class HttpError extends Error {
   }
 
   /**
-   * Duplicate job application. The response body of this case is part of the
-   * week 6 specification, so it is sent exactly as is instead of the usual
-   * error envelope.
+   * Duplicate job application. The week 6 specification fixes the response
+   * body to { error: "Conflict", message: "User has already applied for this
+   * job posting" }, which is exactly what the error handler sends for it.
    */
   static alreadyApplied() {
-    const err = new HttpError(409, 'User has already applied for this job posting');
-    err.responseBody = { error: 'Conflict', message: err.message };
-    return err;
+    return new HttpError(409, 'User has already applied for this job posting');
   }
 }
 

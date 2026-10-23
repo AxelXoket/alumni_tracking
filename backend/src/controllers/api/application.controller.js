@@ -8,7 +8,7 @@ async function index(req, res) {
 }
 
 async function show(req, res) {
-  reply.success(res, await applicationService.getApplication(req.params.id));
+  reply.ok(res, await applicationService.getApplication(req.params.id));
 }
 
 async function store(req, res) {
@@ -17,12 +17,12 @@ async function store(req, res) {
 
 // PATCH /api/applications/:id — only the status can change
 async function update(req, res) {
-  reply.success(res, await applicationService.updateStatus(req.params.id, req.body));
+  reply.ok(res, await applicationService.updateStatus(req.params.id, req.body));
 }
 
 async function destroy(req, res) {
   const application = await applicationService.deleteApplication(req.params.id);
-  reply.success(res, { id: application.id, deleted: true });
+  reply.ok(res, { id: application.id, deleted: true });
 }
 
 // GET /api/users/:id/applications

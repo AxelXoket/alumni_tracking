@@ -7,7 +7,7 @@ const announcementRoutes = require('./announcement.routes');
 const jobRoutes = require('./job.routes');
 const applicationRoutes = require('./application.routes');
 
-/** JSON endpoints. Everything here answers with the { success, data } envelope. */
+/** JSON endpoints. Lists answer with plain arrays, single resources with plain objects. */
 const router = Router();
 
 router.get('/health', system.health);

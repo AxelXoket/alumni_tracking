@@ -13,11 +13,10 @@ describe('health check', () => {
   for (const path of ['/health', '/api/health']) {
     it(`GET ${path} reports the service as healthy`, async () => {
       const res = await request(app).get(path).expect(200);
-      assert.equal(res.body.success, true);
-      assert.equal(res.body.data.status, 'ok');
-      assert.equal(res.body.data.database.connected, true);
-      assert.equal(typeof res.body.data.uptime.seconds, 'number');
-      assert.ok(!Number.isNaN(Date.parse(res.body.data.timestamp)));
+      assert.equal(res.body.status, 'ok');
+      assert.equal(res.body.database.connected, true);
+      assert.equal(typeof res.body.uptime.seconds, 'number');
+      assert.ok(!Number.isNaN(Date.parse(res.body.timestamp)));
     });
   }
 });
@@ -25,18 +24,18 @@ describe('health check', () => {
 describe('GET /hello/:name', () => {
   it('greets the given name', async () => {
     const res = await request(app).get('/hello/Zeynep').expect(200);
-    assert.equal(res.body.data.name, 'Zeynep');
-    assert.match(res.body.data.message, /Hello, Zeynep!/);
+    assert.equal(res.body.name, 'Zeynep');
+    assert.match(res.body.message, /Hello, Zeynep!/);
   });
 
   it('decodes URL encoded names', async () => {
     const res = await request(app).get('/hello/Ali%20Veli').expect(200);
-    assert.equal(res.body.data.name, 'Ali Veli');
+    assert.equal(res.body.name, 'Ali Veli');
   });
 
   it('rejects names longer than 50 characters', async () => {
     const res = await request(app).get(`/hello/${'a'.repeat(51)}`).expect(400);
-    assert.equal(res.body.success, false);
+    assert.equal(typeof res.body.error, 'string');
   });
 });
 
@@ -50,15 +49,15 @@ describe('GET /sum/:number1/:number2', () => {
   for (const [a, b, expected] of cases) {
     it(`${a} + ${b} = ${expected}`, async () => {
       const res = await request(app).get(`/sum/${a}/${b}`).expect(200);
-      assert.equal(res.body.data.result, expected);
-      assert.equal(res.body.data.operation, 'sum');
+      assert.equal(res.body.result, expected);
+      assert.equal(res.body.operation, 'sum');
     });
   }
 
   it('returns 400 when an operand is not a number', async () => {
     const res = await request(app).get('/sum/abc/4').set('Accept', 'text/html').expect(400);
-    assert.equal(res.body.success, false);
-    assert.match(res.body.error.message, /number1/);
+    assert.equal(typeof res.body.error, 'string');
+    assert.match(res.body.message, /number1/);
   });
 
   it('returns 400 for values such as 1e5 or Infinity', async () => {
@@ -108,8 +107,8 @@ describe('API documentation', () => {
 describe('unknown routes', () => {
   it('returns a JSON 404 under /api', async () => {
     const res = await request(app).get('/api/does-not-exist').expect(404);
-    assert.equal(res.body.success, false);
-    assert.equal(res.body.error.status, 404);
+    assert.equal(res.body.error, 'Not Found');
+    assert.match(res.body.message, /does not exist/);
   });
 
   it('returns an HTML 404 page for browsers', async () => {

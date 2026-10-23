@@ -29,7 +29,7 @@
       <li><strong>Controller</strong> reads params/body and calls the service.</li>
       <li><strong>Service</strong> validates input and applies the business rules.</li>
       <li><strong>Model</strong> runs parameterized SQL against PostgreSQL and maps rows to plain objects.</li>
-      <li>The response goes back in a single <code>{ success, data }</code> format.</li>
+      <li>The response is the plain JSON resource; errors share one <code>{ error, message }</code> shape.</li>
     </ol>
   </article>
 </section>
