@@ -1,0 +1,156 @@
+<%- include('../partials/header') %>
+<%
+  const label = (value) => value.replace('_', ' ').replace(/^./, (c) => c.toUpperCase());
+  const formatDate = (iso) => new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const excerpt = (text) => (!text ? '' : text.length > 160 ? `${text.slice(0, 157).trimEnd()}…` : text);
+%>
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Career</p>
+    <h1>Job postings</h1>
+    <p class="muted">Opportunities shared by graduates and faculty. Students and alumni can apply directly.</p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn" href="/applications">Applications</a>
+    <a class="btn" href="/api/jobs" target="_blank" rel="noopener">JSON API</a>
+    <button type="button" class="btn btn--primary" data-open="job-form-dialog" data-mode="create">+ Post a job</button>
+  </div>
+</section>
+
+<%- include('../partials/flash') %>
+
+<section class="grid grid--4" aria-label="Job statistics">
+  <div class="card stat"><span class="stat__value"><%= stats.total %></span><span class="stat__label">Open positions</span></div>
+  <div class="card stat"><span class="stat__value"><%= stats.companies %></span><span class="stat__label">Companies</span></div>
+  <div class="card stat"><span class="stat__value"><%= stats.flexible %></span><span class="stat__label">Remote or hybrid</span></div>
+  <div class="card stat"><span class="stat__value"><%= stats.applications %></span><span class="stat__label">Applications received</span></div>
+</section>
+
+<section class="card">
+  <div class="toolbar">
+    <label class="field field--grow">
+      <span class="visually-hidden">Search jobs</span>
+      <input type="search" class="input" placeholder="Search title, company, location or poster…" data-filter="#job-list" data-key="search">
+    </label>
+    <label class="field">
+      <span class="visually-hidden">Filter by work mode</span>
+      <select class="input" data-filter="#job-list" data-key="mode">
+        <option value="">Any work mode</option>
+        <% workModes.forEach((mode) => { %><option value="<%= mode %>"><%= label(mode) %></option><% }) %>
+      </select>
+    </label>
+    <label class="field">
+      <span class="visually-hidden">Filter by employment type</span>
+      <select class="input" data-filter="#job-list" data-key="type">
+        <option value="">Any type</option>
+        <% employmentTypes.forEach((type) => { %><option value="<%= type %>"><%= label(type) %></option><% }) %>
+      </select>
+    </label>
+  </div>
+
+  <div class="board" id="job-list">
+    <% jobs.forEach((job) => { %>
+    <article class="job" data-item data-mode="<%= job.workMode %>" data-type="<%= job.employmentType %>"
+             data-search="<%= [job.title, job.company, job.location || '', job.postedBy.name].join(' ').toLowerCase() %>">
+      <div class="notice__tags">
+        <span class="badge badge--mode-<%= job.workMode %>"><%= job.workMode %></span>
+        <span class="badge"><%= label(job.employmentType) %></span>
+      </div>
+      <div>
+        <h2 class="notice__title"><a href="/jobs/<%= job.id %>"><%= job.title %></a></h2>
+        <p class="job__company"><%= job.company %><% if (job.location) { %> · <%= job.location %><% } %></p>
+      </div>
+      <p class="notice__text"><%= excerpt(job.description) || 'No description yet.' %></p>
+      <p class="job__meta">
+        Posted by <a href="/users/<%= job.userId %>"><%= job.postedBy.name %></a> · <%= formatDate(job.createdAt) %>
+        · <%= job.applicationCount %> application<%= job.applicationCount === 1 ? '' : 's' %>
+      </p>
+      <footer class="notice__foot">
+        <a class="btn btn--sm btn--ghost" href="/jobs/<%= job.id %>">Details</a>
+        <span class="actions">
+          <button type="button" class="btn btn--sm btn--primary" data-open="apply-dialog"
+            data-record="<%= JSON.stringify({ name: job.title, company: job.company }) %>"
+            data-endpoint="/api/jobs/<%= job.id %>/applications" data-action="/jobs/<%= job.id %>/apply">Apply</button>
+          <button type="button" class="btn btn--sm btn--danger-ghost" data-open="delete-dialog"
+            data-record="<%= JSON.stringify({ name: job.title }) %>"
+            data-endpoint="/api/jobs/<%= job.id %>" data-action="/jobs/<%= job.id %>/delete">Delete</button>
+        </span>
+      </footer>
+    </article>
+    <% }) %>
+  </div>
+  <p class="empty" data-empty-for="#job-list" <%= jobs.length ? 'hidden' : '' %>>No job postings match your filters.</p>
+</section>
+
+<dialog id="job-form-dialog" class="dialog" aria-labelledby="job-form-title">
+  <form method="post" action="/jobs" data-endpoint="/api/jobs" data-method="POST" data-success="created" class="dialog__body">
+    <header class="dialog__head">
+      <h2 id="job-form-title">Post a job</h2>
+      <button type="button" class="btn btn--ghost btn--sm" data-close aria-label="Close">&times;</button>
+    </header>
+    <p class="form-error" role="alert" hidden></p>
+    <label class="field"><span>Posted by *</span>
+      <select class="input" name="userId" required>
+        <option value="">Choose a user…</option>
+        <% users.forEach((user) => { %><option value="<%= user.id %>"><%= user.name %> (<%= user.role %>)</option><% }) %>
+      </select>
+    </label>
+    <label class="field"><span>Job title *</span>
+      <input class="input" name="title" required minlength="2" maxlength="150" placeholder="e.g. Junior Backend Developer">
+    </label>
+    <div class="form-row">
+      <label class="field"><span>Company *</span>
+        <input class="input" name="company" required minlength="2" maxlength="150">
+      </label>
+      <label class="field"><span>Location</span>
+        <input class="input" name="location" maxlength="120" placeholder="City or campus">
+      </label>
+    </div>
+    <div class="form-row">
+      <label class="field"><span>Work mode</span>
+        <select class="input" name="workMode">
+          <% workModes.forEach((mode) => { %><option value="<%= mode %>"><%= label(mode) %></option><% }) %>
+        </select>
+      </label>
+      <label class="field"><span>Employment type</span>
+        <select class="input" name="employmentType">
+          <% employmentTypes.forEach((type) => { %><option value="<%= type %>"><%= label(type) %></option><% }) %>
+        </select>
+      </label>
+    </div>
+    <label class="field"><span>Description</span>
+      <textarea class="input" name="description" maxlength="5000"></textarea>
+    </label>
+    <footer class="dialog__foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn btn--primary">Publish</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog id="apply-dialog" class="dialog" aria-labelledby="apply-title">
+  <form method="post" action="#" data-endpoint="#" data-method="POST" data-success="applied" class="dialog__body">
+    <header class="dialog__head">
+      <h2 id="apply-title">Apply</h2>
+      <button type="button" class="btn btn--ghost btn--sm" data-close aria-label="Close">&times;</button>
+    </header>
+    <p class="muted"><strong data-field="name"></strong> · <span data-field="company"></span></p>
+    <p class="form-error" role="alert" hidden></p>
+    <label class="field"><span>Candidate *</span>
+      <select class="input" name="userId" required>
+        <option value="">Choose a user…</option>
+        <% users.forEach((user) => { %><option value="<%= user.id %>"><%= user.name %> (<%= user.role %>)</option><% }) %>
+      </select>
+    </label>
+    <label class="field"><span>Cover letter</span>
+      <textarea class="input" name="coverLetter" maxlength="2000" placeholder="A few lines about why you are a good fit (optional)"></textarea>
+    </label>
+    <footer class="dialog__foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn btn--primary">Send application</button>
+    </footer>
+  </form>
+</dialog>
+
+<%- include('../partials/delete-dialog', { entity: 'job posting' }) %>
+<%- include('../partials/footer') %>

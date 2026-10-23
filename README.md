@@ -52,6 +52,8 @@ rebuilds.
 | http://localhost:3000/home | Landing page |
 | http://localhost:3000/users | User management page |
 | http://localhost:3000/announcements | Announcement board |
+| http://localhost:3000/jobs | Job postings |
+| http://localhost:3000/applications | Applications |
 | http://localhost:3000/about | About page |
 | http://localhost:3000/api/docs | Swagger UI |
 | http://localhost:3000/api/health | Health check |
@@ -120,7 +122,7 @@ setting.
     │   │   ├── api/          # /api/* and the JSON utility endpoints
     │   │   └── web/          # browser pages
     │   ├── services/         # validation and business rules
-    │   └── views/            # EJS templates (partials, users/, ...)
+    │   └── views/            # EJS templates: partials/, users/, announcements/, jobs/, applications/
     └── tests/                # API tests
 ```
 
@@ -334,6 +336,21 @@ curl -X POST http://localhost:3000/api/jobs/<jobId>/applications \
 Sample job postings and applications are created by the **seed factories**
 (`backend/src/db/factories`) on start.
 
+**Pages (week 6 homework).** `/jobs` and `/applications` use the API above.
+Posting a job sends `POST /api/jobs`. Applying from a job card or the job
+page sends the nested `POST /api/jobs/:id/applications`. A duplicate
+application shows the 409 message ("User has already applied for this job
+posting") inside the form. Changing a status sends
+`PATCH /api/applications/:id`. As on the other pages, every action also works
+without JavaScript through plain form posts:
+
+- `POST /jobs`
+- `POST /jobs/:id/apply`
+- `POST /jobs/:id/delete`
+- `POST /applications`
+- `POST /applications/:id/status`
+- `POST /applications/:id/delete`
+
 ### Swagger
 
 - Swagger UI: http://localhost:3000/api/docs
@@ -350,6 +367,9 @@ Sample job postings and applications are created by the **seed factories**
 | `/users/:id` | User detail page |
 | `/announcements` | Notice board: stats, search, category / priority filters, create / edit / delete |
 | `/announcements/:id` | Announcement detail page |
+| `/jobs` | Job board: stats, search, work-mode / type filters, **post a job**, **apply** from each card, delete |
+| `/jobs/:id` | Job detail with its applications and an apply form |
+| `/applications` | Application tracking: stats per status, search, status filter, new application, **change status**, withdraw |
 
 ## Database
 
@@ -412,3 +432,4 @@ because they share that database.
 | 4 (homework) | Announcements: `AnnouncementModel`, API + web controllers, `/announcements` board |
 | 5 | PostgreSQL persistence: models on SQL, migrations, seeds, `pgdata` volume, [ddd.md](ddd.md) |
 | 6 (in class) | Relational schema: job postings (1:N) and applications (N:M), nested routes, 409 on duplicate application, factory seeding |
+| 6 (homework) | Pages for job postings and applications: post, apply (with 409 feedback), status changes, withdraw |

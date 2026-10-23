@@ -243,3 +243,20 @@ textarea.input { min-height: 110px; resize: vertical; }
 .badge--priority-high { background: var(--danger-soft); color: var(--danger); }
 .badge--priority-normal { background: var(--primary-soft); color: var(--primary); }
 .badge--priority-low { background: var(--surface-alt); color: var(--muted); }
+
+/* --- Jobs & applications ----------------------------------------------- */
+.job { display: flex; flex-direction: column; gap: 10px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.job__company { margin: 2px 0 0; font-weight: 500; color: var(--muted); }
+.job__meta { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 800px) { .split { grid-template-columns: 1fr; } }
+.stack { display: grid; gap: 12px; margin: 0; }
+
+.badge--mode-remote { background: var(--success-soft); color: var(--success); }
+.badge--mode-hybrid { background: var(--info-soft); color: var(--info); }
+.badge--mode-onsite { background: var(--surface-alt); color: var(--muted); }
+.badge--status-applied { background: var(--surface-alt); color: var(--muted); }
+.badge--status-reviewing { background: var(--info-soft); color: var(--info); }
+.badge--status-interview { background: var(--warning-soft); color: var(--warning); }
+.badge--status-accepted { background: var(--success-soft); color: var(--success); }
+.badge--status-rejected { background: var(--danger-soft); color: var(--danger); }

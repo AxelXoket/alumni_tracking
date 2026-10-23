@@ -1,0 +1,74 @@
+<%- include('../partials/header') %>
+<%
+  const label = (value) => value.replace('_', ' ').replace(/^./, (c) => c.toUpperCase());
+  const formatDate = (iso) => new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+%>
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/jobs">Jobs</a> / <span><%= job.title %></span></nav>
+
+<%- include('../partials/flash') %>
+
+<div class="split">
+  <article class="card article">
+    <div class="notice__tags">
+      <span class="badge badge--mode-<%= job.workMode %>"><%= job.workMode %></span>
+      <span class="badge"><%= label(job.employmentType) %></span>
+    </div>
+    <h1><%= job.title %></h1>
+    <p class="job__company"><%= job.company %><% if (job.location) { %> · <%= job.location %><% } %></p>
+    <div class="article__body"><%= job.description || 'No description yet.' %></div>
+    <p class="muted">Posted by <a href="/users/<%= job.userId %>"><%= job.postedBy.name %></a> on <%= formatDate(job.createdAt) %></p>
+    <div class="profile__actions">
+      <a class="btn" href="/jobs">Back to jobs</a>
+      <a class="btn" href="/api/jobs/<%= job.id %>" target="_blank" rel="noopener">View JSON</a>
+      <form method="post" action="/jobs/<%= job.id %>/delete" class="inline-form" data-confirm="Delete this job posting and all of its applications?">
+        <button type="submit" class="btn btn--danger">Delete</button>
+      </form>
+    </div>
+  </article>
+
+  <aside class="card">
+    <h2 class="card__title">Apply for this job</h2>
+    <% if (candidates.length === 0) { %>
+      <p class="muted">Everyone who could apply has already applied.</p>
+    <% } else { %>
+    <form method="post" action="/jobs/<%= job.id %>/apply" data-endpoint="/api/jobs/<%= job.id %>/applications"
+          data-method="POST" data-success="applied" data-redirect="/jobs/<%= job.id %>" class="stack">
+      <p class="form-error" role="alert" hidden></p>
+      <label class="field"><span>Candidate *</span>
+        <select class="input" name="userId" required>
+          <option value="">Choose a user…</option>
+          <% candidates.forEach((user) => { %><option value="<%= user.id %>"><%= user.name %> (<%= user.role %>)</option><% }) %>
+        </select>
+      </label>
+      <label class="field"><span>Cover letter</span>
+        <textarea class="input" name="coverLetter" maxlength="2000"></textarea>
+      </label>
+      <button type="submit" class="btn btn--primary">Send application</button>
+    </form>
+    <% } %>
+  </aside>
+</div>
+
+<section class="card">
+  <h2 class="card__title">Applications (<%= applications.length %>)</h2>
+  <% if (applications.length === 0) { %>
+    <p class="muted">No applications yet.</p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Candidate</th><th>Status</th><th>Cover letter</th><th>Applied</th></tr></thead>
+      <tbody>
+        <% applications.forEach((application) => { %>
+        <tr>
+          <td><a href="/users/<%= application.userId %>"><%= application.candidate.name %></a></td>
+          <td><span class="badge badge--status-<%= application.status %>"><%= application.status %></span></td>
+          <td class="muted"><%= application.coverLetter || '—' %></td>
+          <td><%= formatDate(application.createdAt) %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</section>
+<%- include('../partials/footer') %>
