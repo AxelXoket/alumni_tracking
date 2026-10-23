@@ -1,0 +1,13 @@
+<dialog id="delete-dialog" class="dialog dialog--narrow" aria-labelledby="delete-title">
+  <form method="post" action="#" data-endpoint="#" data-method="DELETE" data-success="deleted" class="dialog__body">
+    <header class="dialog__head">
+      <h2 id="delete-title">Delete <%= entity %>?</h2>
+    </header>
+    <p class="form-error" role="alert" hidden></p>
+    <p><strong data-field="name"></strong> will be removed permanently. This cannot be undone.</p>
+    <footer class="dialog__foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn btn--danger">Delete</button>
+    </footer>
+  </form>
+</dialog>

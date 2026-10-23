@@ -1,4 +1,4 @@
-const config = require('../config');
+const config = require('../../config');
 
 const ENDPOINTS = [
   { method: 'GET', path: '/api/health', description: 'Service health and uptime' },

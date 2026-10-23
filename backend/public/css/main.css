@@ -160,3 +160,64 @@ p { margin: 0 0 1rem; }
 /* --- Empty / error state ----------------------------------------------- */
 .empty-state { text-align: center; padding: 64px 16px; display: grid; justify-items: center; gap: 8px; }
 .empty-state__code { font-size: 4rem; font-weight: 800; color: var(--primary); margin: 0; line-height: 1; }
+
+/* --- Page head actions & toolbar --------------------------------------- */
+.page-head__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.toolbar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.breadcrumb { color: var(--muted); font-size: 0.9rem; }
+
+/* --- Forms ------------------------------------------------------------- */
+.field { display: grid; gap: 4px; font-size: 0.9rem; font-weight: 500; }
+.field--grow { flex: 1 1 260px; }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.input {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font: inherit; font-weight: 400;
+}
+.input:focus { outline: 2px solid var(--primary-soft); border-color: var(--primary); }
+textarea.input { min-height: 110px; resize: vertical; }
+.form-error { margin: 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--danger-soft); color: var(--danger); font-size: 0.9rem; }
+.inline-form { display: inline; margin: 0; }
+
+/* --- People ------------------------------------------------------------ */
+.person { display: flex; align-items: center; gap: 10px; }
+.person__name { font-weight: 600; color: var(--text); }
+.person__meta { font-size: 0.8rem; color: var(--muted); }
+.avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-weight: 700; font-size: 0.8rem; }
+.avatar--lg { width: 64px; height: 64px; font-size: 1.3rem; }
+.profile { display: grid; gap: 20px; }
+.profile__head { display: flex; align-items: center; gap: 16px; }
+.profile__head h1 { margin-bottom: 4px; }
+.profile__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* --- Badges ------------------------------------------------------------ */
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: capitalize; background: var(--surface-alt); color: var(--muted); }
+.badge--alumni { background: var(--primary-soft); color: var(--primary); }
+.badge--student { background: var(--success-soft); color: var(--success); }
+.badge--faculty { background: var(--warning-soft); color: var(--warning); }
+.badge--admin { background: var(--danger-soft); color: var(--danger); }
+
+.btn--danger-ghost { color: var(--danger); }
+.btn--danger-ghost:hover { background: var(--danger-soft); }
+
+/* --- Dialogs ----------------------------------------------------------- */
+.dialog { width: min(560px, 100% - 32px); padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25); }
+.dialog--narrow { width: min(420px, 100% - 32px); }
+.dialog::backdrop { background: rgba(10, 14, 25, 0.55); backdrop-filter: blur(2px); }
+.dialog__body { display: grid; gap: 14px; padding: 20px; margin: 0; }
+.dialog__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dialog__head h2 { margin: 0; font-size: 1.2rem; }
+.dialog__foot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+
+/* --- Flash, toasts, empty ---------------------------------------------- */
+.flash { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; border-radius: var(--radius-sm); font-weight: 500; }
+.flash--success { background: var(--success-soft); color: var(--success); }
+.flash--error { background: var(--danger-soft); color: var(--danger); }
+.flash__close { background: none; border: 0; color: inherit; font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 50; }
+.toast { padding: 10px 16px; border-radius: var(--radius-sm); color: #fff; box-shadow: var(--shadow); animation: toast-in 0.2s ease-out; transition: opacity 0.3s, transform 0.3s; max-width: 360px; }
+.toast--success { background: var(--success); }
+.toast--error { background: var(--danger); }
+.toast.is-leaving { opacity: 0; transform: translateY(8px); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.empty { text-align: center; color: var(--muted); padding: 24px 0 8px; margin: 0; }

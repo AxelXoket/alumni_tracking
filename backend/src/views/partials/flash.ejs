@@ -1,0 +1,6 @@
+<% if (typeof flash !== 'undefined' && flash) { %>
+<div class="flash flash--<%= flash.type %>" role="<%= flash.type === 'error' ? 'alert' : 'status' %>" data-flash>
+  <span><%= flash.text %></span>
+  <button type="button" class="flash__close" aria-label="Dismiss" data-dismiss>&times;</button>
+</div>
+<% } %>

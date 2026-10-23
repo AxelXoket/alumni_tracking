@@ -1,0 +1,117 @@
+<%- include('../partials/header') %>
+<%
+  const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  const formatDate = (iso) => new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+%>
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Directory</p>
+    <h1>Users</h1>
+    <p class="muted">Alumni, students, faculty and administrators of the department.</p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn" href="/api/users" target="_blank" rel="noopener">JSON API</a>
+    <button type="button" class="btn btn--primary" data-open="user-form-dialog" data-mode="create">+ New user</button>
+  </div>
+</section>
+
+<%- include('../partials/flash') %>
+
+<section class="grid grid--4" aria-label="User statistics">
+  <div class="card stat"><span class="stat__value"><%= total %></span><span class="stat__label">Total users</span></div>
+  <div class="card stat"><span class="stat__value"><%= counts.alumni %></span><span class="stat__label">Alumni</span></div>
+  <div class="card stat"><span class="stat__value"><%= counts.student %></span><span class="stat__label">Students</span></div>
+  <div class="card stat"><span class="stat__value"><%= counts.faculty + counts.admin %></span><span class="stat__label">Faculty &amp; admins</span></div>
+</section>
+
+<section class="card">
+  <div class="toolbar">
+    <label class="field field--grow">
+      <span class="visually-hidden">Search users</span>
+      <input type="search" class="input" placeholder="Search by name, email or department…" data-filter="#users-table" data-key="search">
+    </label>
+    <label class="field">
+      <span class="visually-hidden">Filter by role</span>
+      <select class="input" data-filter="#users-table" data-key="role">
+        <option value="">All roles</option>
+        <% roles.forEach((role) => { %><option value="<%= role %>"><%= role[0].toUpperCase() + role.slice(1) %></option><% }) %>
+      </select>
+    </label>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table" id="users-table">
+      <thead>
+        <tr><th>User</th><th>Email</th><th>Role</th><th>Graduation</th><th>Joined</th><th><span class="visually-hidden">Actions</span></th></tr>
+      </thead>
+      <tbody>
+        <% users.forEach((user) => { %>
+        <tr data-item data-role="<%= user.role %>" data-search="<%= [user.name, user.email, user.department || ''].join(' ').toLowerCase() %>">
+          <td>
+            <div class="person">
+              <span class="avatar" aria-hidden="true"><%= initials(user.name) %></span>
+              <div>
+                <a href="/users/<%= user.id %>" class="person__name"><%= user.name %></a>
+                <div class="person__meta"><%= user.department || '—' %></div>
+              </div>
+            </div>
+          </td>
+          <td><a href="mailto:<%= user.email %>"><%= user.email %></a></td>
+          <td><span class="badge badge--<%= user.role %>"><%= user.role %></span></td>
+          <td><%= user.graduationYear || '—' %></td>
+          <td><%= formatDate(user.createdAt) %></td>
+          <td>
+            <div class="actions">
+              <a class="btn btn--sm btn--ghost" href="/users/<%= user.id %>">View</a>
+              <button type="button" class="btn btn--sm" data-open="user-form-dialog" data-mode="edit"
+                data-record="<%= JSON.stringify(user) %>"
+                data-endpoint="/api/users/<%= user.id %>" data-action="/users/<%= user.id %>/edit">Edit</button>
+              <button type="button" class="btn btn--sm btn--danger-ghost" data-open="delete-dialog"
+                data-record="<%= JSON.stringify({ name: user.name }) %>"
+                data-endpoint="/api/users/<%= user.id %>" data-action="/users/<%= user.id %>/delete">Delete</button>
+            </div>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <p class="empty" data-empty-for="#users-table" <%= users.length ? 'hidden' : '' %>>No users match your filters.</p>
+</section>
+
+<dialog id="user-form-dialog" class="dialog" aria-labelledby="user-form-title">
+  <form method="post" action="/users" data-endpoint="/api/users" data-method="POST" data-success="created"
+        data-edit-method="PUT" data-edit-success="updated" class="dialog__body">
+    <header class="dialog__head">
+      <h2 id="user-form-title" data-title-create="New user" data-title-edit="Edit user">New user</h2>
+      <button type="button" class="btn btn--ghost btn--sm" data-close aria-label="Close">&times;</button>
+    </header>
+    <p class="form-error" role="alert" hidden></p>
+    <label class="field"><span>Full name *</span>
+      <input class="input" name="name" required minlength="2" maxlength="100" autocomplete="name">
+    </label>
+    <label class="field"><span>Email *</span>
+      <input class="input" name="email" type="email" required maxlength="255" autocomplete="email">
+    </label>
+    <div class="form-row">
+      <label class="field"><span>Role</span>
+        <select class="input" name="role">
+          <% roles.forEach((role) => { %><option value="<%= role %>"><%= role[0].toUpperCase() + role.slice(1) %></option><% }) %>
+        </select>
+      </label>
+      <label class="field"><span>Graduation year</span>
+        <input class="input" name="graduationYear" type="number" min="1950" max="2100" step="1">
+      </label>
+    </div>
+    <label class="field"><span>Department</span>
+      <input class="input" name="department" maxlength="120">
+    </label>
+    <footer class="dialog__foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn btn--primary">Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<%- include('../partials/delete-dialog', { entity: 'user' }) %>
+<%- include('../partials/footer') %>

@@ -10,7 +10,7 @@ command.
 - [Tech stack](#tech-stack)
 - [Getting started](#getting-started)
 - [Project structure](#project-structure)
-- [Architecture](#architecture)
+- [Architecture (MVC)](#architecture-mvc)
 - [API](#api)
 - [Pages](#pages)
 - [Testing](#testing)
@@ -45,6 +45,7 @@ defaults are listed in [`.env.example`](.env.example).
 | URL | What it is |
 | --- | --- |
 | http://localhost:3000/home | Landing page |
+| http://localhost:3000/users | User management page |
 | http://localhost:3000/about | About page |
 | http://localhost:3000/api/docs | Swagger UI |
 | http://localhost:3000/api/health | Health check |
@@ -74,38 +75,67 @@ reach PostgreSQL.
 └── backend/
     ├── Dockerfile            # two-stage node:22-alpine image, runs as "node"
     ├── package.json
-    ├── public/css/main.css   # shared stylesheet (light + dark)
+    ├── public/
+    │   ├── css/main.css      # shared stylesheet (light + dark)
+    │   └── js/app.js         # small progressive-enhancement script
     ├── src/
     │   ├── index.js          # starts the HTTP server, graceful shutdown
     │   ├── app.js            # builds the Express app (middleware, routes)
     │   ├── config/           # environment settings
-    │   ├── controllers/      # turn HTTP requests into service calls
+    │   ├── controllers/
+    │   │   ├── api/          # JSON controllers  (/api/...)
+    │   │   └── web/          # page controllers  (/users, /home, ...)
     │   ├── db/pool.js        # PostgreSQL connection pool + ping
     │   ├── docs/openapi.js   # OpenAPI 3 document
-    │   ├── lib/              # HttpError, response envelope, validator
+    │   ├── lib/              # HttpError, response envelope, validator, form helpers
     │   ├── middleware/       # 404 and error handlers
-    │   ├── routes/           # URL → controller mapping
+    │   ├── models/           # data models (in memory for now)
+    │   ├── routes/
+    │   │   ├── api/          # /api/* and the JSON utility endpoints
+    │   │   └── web/          # browser pages
     │   ├── services/         # validation and business rules
-    │   ├── store/            # in-memory user storage
-    │   └── views/            # EJS templates
+    │   └── views/            # EJS templates (partials, users/, ...)
     └── tests/                # API tests
 ```
 
-## Architecture
+## Architecture (MVC)
+
+The app follows Model–View–Controller with an extra service layer. Each
+resource has **two controllers**: one that speaks JSON for API clients and one
+that renders pages for the browser. Both call the same service, so the rules
+live in one place.
 
 ```text
-request ──► routes ──► controller ──► service ──► store
-                           │              │
-                           │              └─ validation, 404 / 409 rules
-                           └─ JSON envelope or rendered view
+                       Browser / API client
+                 ┌──────────────┴──────────────┐
+          GET /users (HTML)            GET /api/users (JSON)
+                 │                             │
+     controllers/web/user.controller   controllers/api/user.controller
+     renders views/users/*.ejs         sends { success, data }
+                 └──────────────┬──────────────┘
+                     services/user.service
+                 (validation, unique email → 409)
+                                │
+                      models/user.model (UserModel)
+                         in-memory records
 ```
 
-- **Routes** only map URLs to controller functions.
-- **Controllers** read params and body, call a service and send the response.
-- **Services** validate input and enforce rules (unique email, allowed roles).
-- **Store** keeps records in memory and always hands out copies.
-- Errors are thrown as `HttpError` and formatted in one place
-  (`middleware/error-handler.js`): JSON for API calls, an HTML page for browsers.
+| Layer | File | Responsibility |
+| --- | --- | --- |
+| Model | `models/user.model.js` | `UserModel`: `findAll`, `findById`, `findByEmail`, `create`, `update`, `delete`, `count`, `countByRole`, `reset`. Keeps records in memory (no database yet, as the brief requires) and always returns copies. Methods are async so a database can replace the Map later without touching callers. |
+| View | `views/users/index.ejs`, `views/users/show.ejs` | User list with stats, search, role filter, create/edit/delete dialogs; detail page. Shared layout in `views/partials`. |
+| Controller (API) | `controllers/api/user.controller.js` | `/api/users` CRUD, JSON only. |
+| Controller (web) | `controllers/web/user.controller.js` | Renders the pages and handles plain HTML form posts (`POST /users`, `POST /users/:id/edit`, `POST /users/:id/delete`) with redirect-after-post. |
+| Service | `services/user.service.js` | Validation, filters, unique-email rule. |
+
+**How the pages work:** the list is rendered on the server, so it works with
+JavaScript turned off — forms post to `/users` and the controller redirects
+back with `?status=created` or `?error=...`. When JavaScript is on,
+`public/js/app.js` opens the forms in `<dialog>` windows, sends them to the
+JSON API instead, filters rows while typing, and reloads the list on success.
+
+Errors are thrown as `HttpError` and formatted in one place
+(`middleware/error-handler.js`): JSON for API calls, an HTML page for browsers.
 
 ## API
 
@@ -182,6 +212,8 @@ curl -X DELETE http://localhost:3000/api/users/<id>
 | `/` | Redirects to `/home` |
 | `/home` | Landing page with the endpoint list |
 | `/about` | Tech stack and request flow |
+| `/users` | User directory: stats, search, role filter, create / edit / delete |
+| `/users/:id` | User detail page |
 
 ## Testing
 
@@ -214,3 +246,4 @@ directly, so no server or database has to be running.
 | Week | Work |
 | --- | --- |
 | 1–3 | Express setup, health / hello / sum endpoints, home & about pages, Docker Compose, in-memory user CRUD, Swagger docs |
+| 4 (in class) | MVC refactor: `UserModel`, separate API and web controllers, `/users` management page |

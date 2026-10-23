@@ -1,5 +1,5 @@
-const systemService = require('../services/system.service');
-const { success } = require('../lib/reply');
+const systemService = require('../../services/system.service');
+const { success } = require('../../lib/reply');
 
 async function health(req, res) {
   success(res, await systemService.getHealth());
