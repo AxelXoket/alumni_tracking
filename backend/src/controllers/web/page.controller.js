@@ -16,6 +16,14 @@ const ENDPOINTS = [
   { method: 'PUT', path: '/api/announcements/:id', description: 'Replace an announcement' },
   { method: 'PATCH', path: '/api/announcements/:id', description: 'Update some announcement fields' },
   { method: 'DELETE', path: '/api/announcements/:id', description: 'Delete an announcement' },
+  { method: 'GET', path: '/api/jobs', description: 'List job postings (?userId=, ?workMode=, ?search=)' },
+  { method: 'GET', path: '/api/users/:id/jobs', description: 'Jobs posted by a user' },
+  { method: 'POST', path: '/api/users/:id/jobs', description: 'Post a job as that user' },
+  { method: 'GET', path: '/api/jobs/:id/applications', description: 'Applications of a job' },
+  { method: 'POST', path: '/api/jobs/:id/applications', description: 'Apply to a job (409 if already applied)' },
+  { method: 'GET', path: '/api/users/:id/applications', description: 'Applications of a user' },
+  { method: 'GET', path: '/api/applications', description: 'List applications (?status=)' },
+  { method: 'PATCH', path: '/api/applications/:id', description: 'Change an application status' },
   { method: 'GET', path: '/api/docs', description: 'Swagger UI', example: '/api/docs' },
 ];
 

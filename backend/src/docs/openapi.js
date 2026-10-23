@@ -36,7 +36,7 @@ const query = (name, schema, description) => ({ name, in: 'query', schema, descr
  * Builds the standard list/create + get/put/patch/delete paths of a resource.
  * `conflict` adds a 409 response to the write operations.
  */
-function crudPaths({ path, tag, noun, schema, inputSchema, patchSchema, filters = [], conflict }) {
+function crudPaths({ path, tag, noun, schema, inputSchema, createSchema = inputSchema, patchSchema, filters = [], conflict }) {
   const writeErrors = {
     400: errorResponse('Validation failed'),
     ...(conflict ? { 409: errorResponse(conflict) } : {}),
@@ -54,7 +54,7 @@ function crudPaths({ path, tag, noun, schema, inputSchema, patchSchema, filters 
       post: {
         tags: [tag],
         summary: `Create a ${noun.toLowerCase()}`,
-        requestBody: { required: true, ...json(ref(inputSchema)) },
+        requestBody: { required: true, ...json(ref(createSchema)) },
         responses: { 201: ok(`${noun} created`, ref(schema)), ...writeErrors },
       },
     },
@@ -92,6 +92,9 @@ const timestamps = {
 };
 
 const ROLES = ['alumni', 'student', 'faculty', 'admin'];
+const WORK_MODES = ['onsite', 'hybrid', 'remote'];
+const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'internship', 'contract'];
+const STATUSES = ['applied', 'reviewing', 'interview', 'accepted', 'rejected'];
 const CATEGORIES = ['general', 'academic', 'career', 'event'];
 const PRIORITIES = ['low', 'normal', 'high'];
 
@@ -111,11 +114,120 @@ const announcementFields = {
   author: { type: 'string', minLength: 2, maxLength: 100, example: 'Career Center' },
 };
 
+const jobFields = {
+  title: { type: 'string', minLength: 2, maxLength: 150, example: 'Junior Backend Developer' },
+  company: { type: 'string', minLength: 2, maxLength: 150, example: 'Anatolia Fintech' },
+  location: { type: 'string', maxLength: 120, nullable: true, example: 'Istanbul' },
+  workMode: { type: 'string', enum: WORK_MODES, default: 'onsite' },
+  employmentType: { type: 'string', enum: EMPLOYMENT_TYPES, default: 'full_time' },
+  description: { type: 'string', maxLength: 5000, nullable: true },
+};
+
+const summary = (props) => ({ type: 'object', properties: props });
+
+const conflictResponse = {
+  description: 'The user has already applied for this job posting',
+  ...json(ref('AlreadyApplied')),
+};
+
+const userIdParam = idParam('User UUID');
+
+const nestedPaths = {
+  '/api/users/{id}/jobs': {
+    parameters: [userIdParam],
+    get: {
+      tags: ['Jobs'],
+      summary: 'Jobs posted by a user (one-to-many)',
+      responses: { 200: listOk('Job list', ref('JobPosting')), 404: errorResponse('User not found') },
+    },
+    post: {
+      tags: ['Jobs'],
+      summary: 'Post a job as this user',
+      description: 'The poster is always the user in the URL. A `userId` in the body is ignored.',
+      requestBody: { required: true, ...json(ref('JobInput')) },
+      responses: {
+        201: ok('Job created', ref('JobPosting')),
+        400: errorResponse('Validation failed'),
+        404: errorResponse('User not found'),
+      },
+    },
+  },
+  '/api/users/{id}/applications': {
+    parameters: [userIdParam],
+    get: {
+      tags: ['Applications'],
+      summary: 'Applications sent by a user',
+      responses: { 200: listOk('Application list', ref('Application')), 404: errorResponse('User not found') },
+    },
+  },
+  '/api/jobs/{id}/applications': {
+    parameters: [idParam('Job posting UUID')],
+    get: {
+      tags: ['Applications'],
+      summary: 'Applications received by a job posting',
+      responses: { 200: listOk('Application list', ref('Application')), 404: errorResponse('Job posting not found') },
+    },
+    post: {
+      tags: ['Applications'],
+      summary: 'Apply to this job (many-to-many)',
+      requestBody: { required: true, ...json(ref('ApplyInput')) },
+      responses: {
+        201: ok('Application created', ref('Application')),
+        400: errorResponse('Validation failed'),
+        404: errorResponse('User or job posting not found'),
+        409: conflictResponse,
+      },
+    },
+  },
+  '/api/applications': {
+    get: {
+      tags: ['Applications'],
+      summary: 'List applications',
+      parameters: [query('status', { type: 'string', enum: STATUSES })],
+      responses: { 200: listOk('Application list', ref('Application')), 400: errorResponse('Invalid filter') },
+    },
+    post: {
+      tags: ['Applications'],
+      summary: 'Create an application (job named in the body)',
+      requestBody: { required: true, ...json(ref('ApplicationInput')) },
+      responses: {
+        201: ok('Application created', ref('Application')),
+        400: errorResponse('Validation failed'),
+        404: errorResponse('User or job posting not found'),
+        409: conflictResponse,
+      },
+    },
+  },
+  '/api/applications/{id}': {
+    parameters: [idParam('Application UUID')],
+    get: {
+      tags: ['Applications'],
+      summary: 'Get an application',
+      responses: { 200: ok('Application', ref('Application')), 404: errorResponse('Application not found') },
+    },
+    patch: {
+      tags: ['Applications'],
+      summary: 'Change the status of an application',
+      requestBody: { required: true, ...json(ref('StatusInput')) },
+      responses: {
+        200: ok('Updated application', ref('Application')),
+        400: errorResponse('Invalid status'),
+        404: errorResponse('Application not found'),
+      },
+    },
+    delete: {
+      tags: ['Applications'],
+      summary: 'Withdraw (delete) an application',
+      responses: { 200: ok('Deleted', ref('Deleted')), 404: errorResponse('Application not found') },
+    },
+  },
+};
+
 module.exports = {
   openapi: '3.0.3',
   info: {
     title: 'Alumni Tracking System API',
-    version: '0.4.0',
+    version: '0.6.0',
     description:
       'REST API of the Alumni Tracking System course project. Every response uses the `{ success, data }` envelope; errors use `{ success: false, error }`.',
   },
@@ -124,6 +236,8 @@ module.exports = {
     { name: 'System', description: 'Health check and utility endpoints' },
     { name: 'Users', description: 'User management' },
     { name: 'Announcements', description: 'Notice board for alumni and students' },
+    { name: 'Jobs', description: 'Job postings (users 1 ──< N job_postings)' },
+    { name: 'Applications', description: 'Applications (users N >──< M job_postings)' },
   ],
   paths: {
     '/api/health': {
@@ -192,6 +306,21 @@ module.exports = {
         query('search', { type: 'string' }, 'Matches title, content or author'),
       ],
     }),
+    ...crudPaths({
+      path: '/api/jobs',
+      tag: 'Jobs',
+      noun: 'Job posting',
+      schema: 'JobPosting',
+      inputSchema: 'JobInput',
+      createSchema: 'JobCreateInput',
+      patchSchema: 'JobPatch',
+      filters: [
+        query('userId', { type: 'string', format: 'uuid' }, 'Only jobs posted by this user'),
+        query('workMode', { type: 'string', enum: WORK_MODES }),
+        query('search', { type: 'string' }, 'Matches title, company or location'),
+      ],
+    }),
+    ...nestedPaths,
   },
   components: {
     schemas: {
@@ -241,6 +370,64 @@ module.exports = {
         properties: announcementFields,
       },
       AnnouncementPatch: { type: 'object', properties: announcementFields, minProperties: 1 },
+      JobPosting: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          userId: { type: 'string', format: 'uuid' },
+          ...jobFields,
+          applicationCount: { type: 'integer' },
+          postedBy: summary({ id: { type: 'string', format: 'uuid' }, name: { type: 'string' }, email: { type: 'string' } }),
+          ...timestamps,
+        },
+      },
+      JobInput: { type: 'object', required: ['title', 'company'], properties: jobFields },
+      JobCreateInput: {
+        type: 'object',
+        required: ['userId', 'title', 'company'],
+        properties: { userId: { type: 'string', format: 'uuid', description: 'Poster' }, ...jobFields },
+      },
+      JobPatch: { type: 'object', properties: jobFields, minProperties: 1 },
+      Application: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          userId: { type: 'string', format: 'uuid' },
+          jobPostingId: { type: 'string', format: 'uuid' },
+          status: { type: 'string', enum: STATUSES },
+          coverLetter: { type: 'string', nullable: true },
+          candidate: summary({ id: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' } }),
+          job: summary({ id: { type: 'string' }, title: { type: 'string' }, company: { type: 'string' } }),
+          ...timestamps,
+        },
+      },
+      ApplyInput: {
+        type: 'object',
+        required: ['userId'],
+        properties: {
+          userId: { type: 'string', format: 'uuid', description: 'Candidate' },
+          status: { type: 'string', enum: STATUSES, default: 'applied' },
+          coverLetter: { type: 'string', maxLength: 2000 },
+        },
+      },
+      ApplicationInput: {
+        type: 'object',
+        required: ['userId', 'jobPostingId'],
+        properties: {
+          userId: { type: 'string', format: 'uuid' },
+          jobPostingId: { type: 'string', format: 'uuid' },
+          status: { type: 'string', enum: STATUSES, default: 'applied' },
+          coverLetter: { type: 'string', maxLength: 2000 },
+        },
+      },
+      StatusInput: { type: 'object', required: ['status'], properties: { status: { type: 'string', enum: STATUSES } } },
+      AlreadyApplied: {
+        type: 'object',
+        properties: {
+          error: { type: 'string', example: 'Conflict' },
+          message: { type: 'string', example: 'User has already applied for this job posting' },
+        },
+      },
     },
   },
 };

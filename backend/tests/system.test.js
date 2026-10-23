@@ -95,6 +95,8 @@ describe('API documentation', () => {
     assert.ok(res.body.paths['/api/users/{id}']);
     assert.ok(res.body.paths['/api/announcements']);
     assert.ok(res.body.paths['/api/announcements/{id}']);
+    assert.ok(res.body.paths['/api/jobs/{id}/applications'].post.responses[409]);
+    assert.ok(res.body.paths['/api/users/{id}/jobs'].post);
   });
 
   it('serves Swagger UI', async () => {

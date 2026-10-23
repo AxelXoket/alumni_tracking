@@ -34,7 +34,10 @@ async function prepareDatabase() {
   await resetDatabase();
 }
 
-/** Empties every table (CASCADE follows foreign keys) and reloads the seed data. */
+/**
+ * Empties every table and reloads the seed data. CASCADE also empties the
+ * tables that reference users (job_postings, applications).
+ */
 async function resetDatabase() {
   await db.getPool().query('TRUNCATE users, announcements CASCADE');
   await seed({ log: quiet });

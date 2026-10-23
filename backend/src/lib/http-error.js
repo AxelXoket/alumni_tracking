@@ -21,6 +21,17 @@ class HttpError extends Error {
   static conflict(message) {
     return new HttpError(409, message);
   }
+
+  /**
+   * Duplicate job application. The response body of this case is part of the
+   * week 6 specification, so it is sent exactly as is instead of the usual
+   * error envelope.
+   */
+  static alreadyApplied() {
+    const err = new HttpError(409, 'User has already applied for this job posting');
+    err.responseBody = { error: 'Conflict', message: err.message };
+    return err;
+  }
 }
 
 module.exports = HttpError;

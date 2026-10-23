@@ -108,9 +108,10 @@ setting.
     │   ├── db/
     │   │   ├── pool.js       # PostgreSQL connection pool + ping
     │   │   ├── migrate.js    # migration runner (schema_migrations table)
-    │   │   ├── seed.js       # loads the seed files
-    │   │   ├── migrations/   # 001_create_users_and_announcements.sql, ...
-    │   │   └── seeds/        # idempotent sample data
+    │   │   ├── seed.js       # loads the seed files, then runs the factories
+    │   │   ├── migrations/   # 001_..., 002_create_job_postings_and_applications.sql
+    │   │   ├── seeds/        # idempotent SQL sample data
+    │   │   └── factories/    # job posting + application factories (build / create / seed)
     │   ├── docs/openapi.js   # OpenAPI 3 document
     │   ├── lib/              # HttpError, response envelope, validator, form helpers
     │   ├── middleware/       # 404 and error handlers
@@ -259,6 +260,80 @@ curl -X POST http://localhost:3000/api/announcements \
 curl "http://localhost:3000/api/announcements?category=event&priority=high"
 ```
 
+### Job postings and applications (week 6)
+
+Two related resources:
+
+- **Job postings** belong to the user who posted them (**one-to-many**,
+  `job_postings.user_id`).
+- **Applications** connect users and job postings (**many-to-many** through
+  the `applications` join table, which also stores `status` and an optional
+  `coverLetter`).
+
+Deleting a user deletes their jobs and applications. Deleting a job deletes
+its applications (`ON DELETE CASCADE`). Details are in [ddd.md](ddd.md).
+
+**Nested routes**
+
+| Method | Path | Description | Success | Errors |
+| --- | --- | --- | --- | --- |
+| GET | `/api/users/:id/jobs` | Jobs posted by the user | 200 | 404 |
+| POST | `/api/users/:id/jobs` | Post a job as this user. The poster is taken **only from the URL**; a `userId` in the body is ignored. | 201 | 400, 404 |
+| GET | `/api/users/:id/applications` | Applications sent by the user | 200 | 404 |
+| GET | `/api/jobs/:id/applications` | Applications received by the job | 200 | 404 |
+| POST | `/api/jobs/:id/applications` | Apply: body `{ "userId", "status"?, "coverLetter"? }` | 201 | 400, 404, **409** |
+
+**Top-level routes**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/api/jobs` | List jobs, newest first; `?userId=`, `?workMode=`, `?search=` |
+| POST | `/api/jobs` | Create a job; the poster is given as `userId` in the body |
+| GET / PUT / PATCH / DELETE | `/api/jobs/:id` | Read, replace, update or delete a job |
+| GET | `/api/applications` | List applications; `?status=` |
+| POST | `/api/applications` | Apply; body `{ "userId", "jobPostingId", ... }` |
+| GET / DELETE | `/api/applications/:id` | Read or withdraw an application |
+| PATCH | `/api/applications/:id` | Change the status: `{ "status": "interview" }` |
+
+**One application per user per job.** A second application by the same user
+to the same job returns `409 Conflict` with exactly this body:
+
+```json
+{ "error": "Conflict", "message": "User has already applied for this job posting" }
+```
+
+The service checks for an existing pair first. The
+`UNIQUE (user_id, job_posting_id)` constraint covers two requests arriving
+at the same time.
+
+| Job field | Rules |
+| --- | --- |
+| `title`, `company` | required, 2–150 characters |
+| `location` | optional, up to 120 characters |
+| `workMode` | `onsite` (default), `hybrid`, `remote` |
+| `employmentType` | `full_time` (default), `part_time`, `internship`, `contract` |
+| `description` | optional, up to 5000 characters |
+
+| Application field | Rules |
+| --- | --- |
+| `status` | `applied` (default), `reviewing`, `interview`, `accepted`, `rejected` |
+| `coverLetter` | optional, up to 2000 characters |
+
+```bash
+# Elif posts a job (the poster comes from the URL)
+curl -X POST http://localhost:3000/api/users/6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e01/jobs \
+  -H "Content-Type: application/json" \
+  -d '{"title":"QA Engineer","company":"Galata Software","workMode":"remote"}'
+
+# Mert applies to it; running this twice returns 409
+curl -X POST http://localhost:3000/api/jobs/<jobId>/applications \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e02","coverLetter":"Final-year student, keen on testing."}'
+```
+
+Sample job postings and applications are created by the **seed factories**
+(`backend/src/db/factories`) on start.
+
 ### Swagger
 
 - Swagger UI: http://localhost:3000/api/docs
@@ -287,6 +362,9 @@ Summary:
 - `users` and `announcements` tables with UUID keys, `CHECK` constraints for
   the allowed values, a case-insensitive unique index on `email`, and
   `updated_at` triggers.
+- `job_postings` (one-to-many from users) and `applications` (many-to-many
+  join table) with foreign keys, `ON DELETE CASCADE`, and a
+  `UNIQUE (user_id, job_posting_id)` rule.
 - Plain SQL migrations in `backend/src/db/migrations`, applied in order and
   recorded in `schema_migrations`. Each file runs in its own transaction.
 - Idempotent seed files in `backend/src/db/seeds` (`ON CONFLICT DO NOTHING`).
@@ -333,3 +411,4 @@ because they share that database.
 | 4 (in class) | MVC refactor: `UserModel`, separate API and web controllers, `/users` management page |
 | 4 (homework) | Announcements: `AnnouncementModel`, API + web controllers, `/announcements` board |
 | 5 | PostgreSQL persistence: models on SQL, migrations, seeds, `pgdata` volume, [ddd.md](ddd.md) |
+| 6 (in class) | Relational schema: job postings (1:N) and applications (N:M), nested routes, 409 on duplicate application, factory seeding |
