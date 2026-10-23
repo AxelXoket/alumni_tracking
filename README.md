@@ -1,421 +1,331 @@
-# Alumni Tracking System
+<p align="center">
+  <h1 align="center">Alumni Tracking System</h1>
+  <p align="center">
+    <strong>Course project for keeping track of graduates, students and faculty — REST API, server-rendered pages and PostgreSQL</strong>
+  </p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/node.js-22_LTS-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js">
+    <img src="https://img.shields.io/badge/express-5-000000?style=flat-square&logo=express&logoColor=white" alt="Express">
+    <img src="https://img.shields.io/badge/postgresql-16-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL">
+    <img src="https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Compose">
+    <img src="https://img.shields.io/badge/openapi-3.0-6BA539?style=flat-square&logo=openapiinitiative&logoColor=white" alt="OpenAPI">
+    <img src="https://img.shields.io/badge/version-0.6.0-7a1f2e?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/tests-124_passed-success?style=flat-square" alt="Tests">
+  </p>
+  <p align="center">
+    <img src="assets/jobs.png" alt="Alumni Tracking System — job postings" width="820">
+  </p>
+</p>
 
-Course project: a Node.js / Express backend that keeps track of a department's
-alumni, students and faculty. It exposes a documented REST API and a few
-server-rendered pages, and the whole stack runs with a single Docker Compose
-command.
+---
 
-## Contents
+Alumni Tracking System is a Node.js / Express application that keeps a department's **alumni, students, faculty and administrators** in one place. It exposes a documented **REST API** (Swagger UI included), serves **server-rendered pages** for managing the data in a browser, and stores everything in **PostgreSQL 16**. The whole stack starts with a single `docker compose up --build`.
 
-- [Tech stack](#tech-stack)
-- [Getting started](#getting-started)
-- [Project structure](#project-structure)
-- [Architecture (MVC)](#architecture-mvc)
-- [API](#api)
-- [Pages](#pages)
-- [Database](#database)
-- [Testing](#testing)
-- [Configuration](#configuration)
-- [Weekly progress](#weekly-progress)
+The project was built week by week as course work. It started with an in-memory user API, moved to an MVC structure, then to PostgreSQL with migrations, and finally added relations between tables: job postings and applications.
 
-## Tech stack
+## Features
 
-| Area | Choice |
-| --- | --- |
-| Runtime | Node.js 22 (works on 20+) |
-| Web framework | Express 5 |
-| Views | EJS templates, plain CSS and JavaScript (burgundy / off-white theme, square corners) |
-| API docs | OpenAPI 3.0 + Swagger UI |
-| Database | PostgreSQL 16 (container), `pg` driver, SQL migrations |
-| Security | Helmet, CORS |
-| Tests | `node:test` + Supertest |
-| Containers | Docker, Docker Compose |
+- **REST API** — CRUD for users, announcements, job postings and applications, with filters (`?role=`, `?category=`, `?workMode=`, `?status=`, `?search=`) and plain JSON responses
+- **MVC with Dual Controllers** — Every resource has an API controller (JSON, `/api/...`) and a web controller (HTML pages); both share one service layer
+- **Relational Schema** — `users 1 ──< N job_postings` and `users N >──< M job_postings` through `applications`, with `ON DELETE CASCADE` on every foreign key
+- **Nested Routes** — `/api/users/:id/jobs`, `/api/users/:id/applications`, `/api/jobs/:id/applications`; the parent always comes from the URL
+- **Duplicate Protection** — One application per user per job, checked in the service *and* by a `UNIQUE` constraint; duplicates return `409 Conflict`
+- **Validation Everywhere** — Request bodies are validated in the service layer (400 with per-field details) and repeated as `CHECK` constraints in the database
+- **SQL Migrations & Seeding** — Versioned migrations tracked in `schema_migrations` (one transaction per file, advisory lock), idempotent seeds and factories
+- **Server-Rendered UI** — EJS pages with live search, filters, statistics and `<dialog>` forms; every action also works **without JavaScript** through plain form posts
+- **Burgundy / Off-White Design** — Custom stylesheet with serif headings, square corners on every element, no UI framework and no external assets
+- **Swagger Documentation** — Full OpenAPI 3.0 document at `/api/docs`, including schemas, filters and error responses
+- **One-Command Startup** — Docker Compose waits for the database healthcheck, then the API migrates, seeds and starts; data lives in a named volume
+- **Tested Against Real PostgreSQL** — 124 integration and model tests with `node:test` + Supertest on a separate test database
 
-## Getting started
+## Architecture
 
-### With Docker (recommended)
+```
+┌──────────────────────────────────────────────────────────────┐
+│                  Browser / API client                        │
+│                                                              │
+│   Pages (EJS + app.js)        REST clients / Swagger UI      │
+│   /users  /announcements      /api/users   /api/jobs         │
+│   /jobs   /applications       /api/docs    ...               │
+└──────────────────────────────────────────────────────────────┘
+            │ HTML                          │ JSON
+            ▼                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    Express 5  (src/app.js)                   │
+│           Helmet · CORS · Morgan · JSON / form parsers       │
+│                                                              │
+│   routes/web                    routes/api                   │
+│       ▼                             ▼                        │
+│   controllers/web               controllers/api              │
+│   render views, form posts      plain JSON responses         │
+│       └──────────────┬──────────────┘                        │
+│                      ▼                                       │
+│   services/   validation, business rules, 404 / 409          │
+│                      ▼                                       │
+│   models/     parameterized SQL, joins, row mapping          │
+│                                                              │
+│   middleware/error-handler: HttpError + PG codes → HTTP      │
+└──────────────────────────────────────────────────────────────┘
+                               │ pg Pool
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                 PostgreSQL 16  (db service)                  │
+│   users · announcements · job_postings · applications        │
+│   schema_migrations                    volume: pgdata        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+| Layer | Location | Responsibility |
+|:---|:---|:---|
+| Routes | `src/routes/api`, `src/routes/web` | Map URLs to controller functions only |
+| Controllers (API) | `src/controllers/api` | Read params and body, call a service, send JSON |
+| Controllers (web) | `src/controllers/web` | Render EJS views, handle form posts with redirect-after-post |
+| Services | `src/services` | Validation, filters, existence checks, unique rules (409) |
+| Models | `src/models` | SQL queries, joins, snake_case → camelCase mapping |
+| Views | `src/views` | EJS templates with shared partials (header, flash, dialogs) |
+
+Errors are thrown as `HttpError` and formatted in one place. API routes always get JSON, and browser pages get an HTML error page.
+
+## Quick Start
+
+### Prerequisites
+
+- **Docker** with Docker Compose v2
+- or **Node.js 20+** (22 LTS recommended) and a PostgreSQL 16 server for running without Docker
+
+### Run with Docker
 
 ```bash
+git clone https://github.com/AxelXoket/alumni_tracking.git
+cd alumni_tracking
 docker compose up --build
 ```
 
-That is the only command needed. Compose starts PostgreSQL, waits until it is
-healthy, then builds and starts the API. On start the API applies any pending
-database migrations and loads the sample data. No `.env` file is required; the
-defaults are listed in [`.env.example`](.env.example).
+Compose starts PostgreSQL, waits for `pg_isready`, then builds and starts the API. On start, the API applies pending migrations and loads the sample data. No `.env` file is needed; every default is listed in [`.env.example`](.env.example).
 
-Data is stored in the named volume `pgdata`, so it survives restarts and
-rebuilds.
-
-| URL | What it is |
-| --- | --- |
-| http://localhost:3000/home | Landing page |
-| http://localhost:3000/users | User management page |
+| URL | Description |
+|:---|:---|
+| http://localhost:3000/home | Landing page with the endpoint list |
+| http://localhost:3000/users | User directory |
 | http://localhost:3000/announcements | Announcement board |
 | http://localhost:3000/jobs | Job postings |
-| http://localhost:3000/applications | Applications |
-| http://localhost:3000/about | About page |
+| http://localhost:3000/applications | Application tracking |
 | http://localhost:3000/api/docs | Swagger UI |
 | http://localhost:3000/api/health | Health check |
-| http://localhost:3000/api/users | Users API |
 
-Stop the stack with `docker compose down`. Add `-v` to also delete the database volume.
+Stop with `docker compose down`. Add `-v` to also delete the database volume.
 
-### Without Docker
+### Run without Docker
 
 ```bash
+docker compose up -d db        # or point DB_* at your own PostgreSQL
 cd backend
 npm install
-npm run dev        # restarts on file changes
+npm run dev                    # migrates, seeds and restarts on file changes
 ```
 
-The API needs a PostgreSQL database. The easiest option is the one from Compose:
+| Script | Description |
+|:---|:---|
+| `npm start` | Migrate, seed and start the server |
+| `npm run dev` | Same as start, restarting on file changes |
+| `npm run migrate` | Apply pending migrations only |
+| `npm run seed` | Load the sample data only (idempotent) |
+| `npm test` | Run the test suite against the test database |
 
-```bash
-docker compose up -d db     # PostgreSQL only, published on localhost:5432
-cd backend && npm run dev
-```
+## API Endpoints
 
-Copy `.env.example` to `.env` in the repository root if you want to change any
-setting.
-
-| Script | What it does |
-| --- | --- |
-| `npm start` | migrate, seed, start the server |
-| `npm run dev` | same, restarting on file changes |
-| `npm run migrate` | apply pending migrations only |
-| `npm run seed` | load the sample data only (idempotent) |
-| `npm test` | run the test suite against the test database |
-
-## Project structure
-
-```text
-.
-├── docker-compose.yml        # db (PostgreSQL 16) + api services, pgdata volume
-├── .env.example              # every supported setting with its default
-├── ddd.md                    # data design document
-└── backend/
-    ├── Dockerfile            # two-stage node:22-alpine image, runs as "node"
-    ├── package.json
-    ├── public/
-    │   ├── css/main.css      # shared stylesheet (light + dark)
-    │   └── js/app.js         # small progressive-enhancement script
-    ├── src/
-    │   ├── index.js          # starts the HTTP server, graceful shutdown
-    │   ├── app.js            # builds the Express app (middleware, routes)
-    │   ├── config/           # environment settings
-    │   ├── controllers/
-    │   │   ├── api/          # JSON controllers  (/api/...)
-    │   │   └── web/          # page controllers  (/users, /home, ...)
-    │   ├── db/
-    │   │   ├── pool.js       # PostgreSQL connection pool + ping
-    │   │   ├── migrate.js    # migration runner (schema_migrations table)
-    │   │   ├── seed.js       # loads the seed files, then runs the factories
-    │   │   ├── migrations/   # 001_..., 002_create_job_postings_and_applications.sql
-    │   │   ├── seeds/        # idempotent SQL sample data
-    │   │   └── factories/    # job posting + application factories (build / create / seed)
-    │   ├── docs/openapi.js   # OpenAPI 3 document
-    │   ├── lib/              # HttpError, JSON response helpers, validator, form helpers
-    │   ├── middleware/       # 404 and error handlers
-    │   ├── models/           # data models (PostgreSQL)
-    │   ├── routes/
-    │   │   ├── api/          # /api/* and the JSON utility endpoints
-    │   │   └── web/          # browser pages
-    │   ├── services/         # validation and business rules
-    │   └── views/            # EJS templates: partials/, users/, announcements/, jobs/, applications/
-    └── tests/                # API tests
-```
-
-## Architecture (MVC)
-
-The app follows Model–View–Controller with an extra service layer. Each
-resource has **two controllers**: one that speaks JSON for API clients and one
-that renders pages for the browser. Both call the same service, so the rules
-live in one place.
-
-```text
-                       Browser / API client
-                 ┌──────────────┴──────────────┐
-          GET /users (HTML)            GET /api/users (JSON)
-                 │                             │
-     controllers/web/user.controller   controllers/api/user.controller
-     renders views/users/*.ejs         sends plain JSON
-                 └──────────────┬──────────────┘
-                     services/user.service
-                 (validation, unique email → 409)
-                                │
-                      models/user.model (UserModel)
-                        PostgreSQL `users` table
-```
-
-| Layer | File | Responsibility |
-| --- | --- | --- |
-| Model | `models/user.model.js` | `UserModel`: `findAll`, `findById`, `findByEmail`, `create`, `update`, `delete`, `count`, `countByRole`. In week 4 it kept records in memory; since week 5 it runs parameterized SQL against the `users` table. The interface stayed the same, so nothing above the model changed. |
-| View | `views/users/index.ejs`, `views/users/show.ejs` | User list with stats, search, role filter, create/edit/delete dialogs; detail page. Shared layout in `views/partials`. |
-| Controller (API) | `controllers/api/user.controller.js` | `/api/users` CRUD, JSON only. |
-| Controller (web) | `controllers/web/user.controller.js` | Renders the pages and handles plain HTML form posts (`POST /users`, `POST /users/:id/edit`, `POST /users/:id/delete`) with redirect-after-post. |
-| Service | `services/user.service.js` | Validation, filters, unique-email rule. |
-| Model | `models/announcement.model.js` | `AnnouncementModel`, same interface as `UserModel` plus `countByCategory`. |
-| View | `views/announcements/index.ejs`, `views/announcements/show.ejs` | Card board with category / priority badges, search and filters, create / edit / delete dialogs; detail page. |
-| Controllers | `controllers/api/announcement.controller.js`, `controllers/web/announcement.controller.js` | JSON API at `/api/announcements`, pages and form fallbacks at `/announcements`. |
-| Service | `services/announcement.service.js` | Validation of title, content, category, priority and author. |
-
-**How the pages work:** the list is rendered on the server, so it works with
-JavaScript turned off — forms post to `/users` and the controller redirects
-back with `?status=created` or `?error=...`. When JavaScript is on,
-`public/js/app.js` opens the forms in `<dialog>` windows, sends them to the
-JSON API instead, filters rows while typing, and reloads the list on success.
-
-Errors are thrown as `HttpError` and formatted in one place
-(`middleware/error-handler.js`): JSON for API calls, an HTML page for browsers.
-
-## API
-
-Responses are plain JSON, with no wrapper object:
-
-- **List endpoints** return a JSON array, e.g. `GET /api/users` → `[ { ... }, { ... } ]`.
-  The number of items is also sent in the `X-Total-Count` header.
-- **Single resources** return the object itself, e.g. `GET /api/users/:id` → `{ "id": "...", "name": "...", ... }`.
-- **Deletes** return `{ "id": "...", "deleted": true }`.
-- **Errors** share one flat shape: `error` is the HTTP reason phrase, and
-  `details` lists the invalid fields when validation fails.
+Responses are plain JSON. Lists are arrays, and their size is also in the `X-Total-Count` header. Single resources are objects. Errors share one shape:
 
 ```json
-{ "error": "Bad Request", "message": "Validation failed", "details": [ { "field": "email", "message": "email is required" } ] }
-{ "error": "Not Found", "message": "User 00000000-0000-4000-8000-000000000000 not found" }
-{ "error": "Conflict", "message": "User has already applied for this job posting" }
+{ "error": "Bad Request", "message": "Validation failed", "details": [{ "field": "email", "message": "email is required" }] }
 ```
 
 ### System
 
-| Method | Path | Description |
-| --- | --- | --- |
-| GET | `/health`, `/api/health` | Status, uptime, runtime info and database connectivity |
-| GET | `/hello/:name` | Returns a greeting for `name` (max 50 chars) |
-| GET | `/sum/:number1/:number2` | Adds two numbers, `400` if either is not a number |
-
-```bash
-curl http://localhost:3000/hello/Cagri
-# {"name":"Cagri","message":"Hello, Cagri! Welcome to the Alumni Tracking System."}
-
-curl http://localhost:3000/sum/15/27
-# {"operation":"sum","number1":15,"number2":27,"result":42}
-```
+| Endpoint | Description |
+|:---|:---|
+| `GET /api/health` (also `/health`) | Status, uptime, runtime info, database connectivity |
+| `GET /hello/:name` | Greeting for `name` (max 50 characters) |
+| `GET /sum/:number1/:number2` | Adds two numbers; `400` if either is not a number |
+| `GET /api/docs` · `GET /api/openapi.json` | Swagger UI · raw OpenAPI document |
 
 ### Users
 
-In weeks 3–4 users were kept in memory, as the brief required. Since week 5
-they are stored in PostgreSQL. Four sample users are seeded on the first start.
-
-| Method | Path | Description | Success | Errors |
-| --- | --- | --- | --- | --- |
-| GET | `/api/users` | List users, optional `?role=` and `?search=` | 200 | 400 |
-| POST | `/api/users` | Create a user | 201 | 400, 409 |
-| GET | `/api/users/:id` | Get one user | 200 | 404 |
-| PUT | `/api/users/:id` | Replace a user (all required fields) | 200 | 400, 404, 409 |
-| PATCH | `/api/users/:id` | Update some fields | 200 | 400, 404, 409 |
-| DELETE | `/api/users/:id` | Delete a user | 200 | 404 |
-
-User fields:
-
-| Field | Rules |
-| --- | --- |
-| `name` | required, 2–100 characters |
-| `email` | required, valid email, unique (case-insensitive) |
-| `role` | `alumni` (default), `student`, `faculty`, `admin` |
-| `department` | optional, up to 120 characters |
-| `graduationYear` | optional whole number, 1950–2100 |
-
-```bash
-curl -X POST http://localhost:3000/api/users \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Zeynep Arslan","email":"zeynep@alumni.example.edu","graduationYear":2021}'
-
-curl -X PATCH http://localhost:3000/api/users/<id> \
-  -H "Content-Type: application/json" \
-  -d '{"role":"faculty"}'
-
-curl -X DELETE http://localhost:3000/api/users/<id>
-```
+| Endpoint | Description | Errors |
+|:---|:---|:---|
+| `GET /api/users` | List users (`?role=`, `?search=`) | 400 |
+| `POST /api/users` | Create: `name`, `email` (unique), `role`, `department`, `graduationYear` | 400, 409 |
+| `GET /api/users/:id` | Get one user | 404 |
+| `PUT /api/users/:id` | Replace (all required fields) | 400, 404, 409 |
+| `PATCH /api/users/:id` | Update some fields | 400, 404, 409 |
+| `DELETE /api/users/:id` | Delete (cascades to their jobs and applications) | 404 |
 
 ### Announcements
 
-A notice board for graduates and students, built with the same MVC pattern as
-users: model, service, API controller, web controller and views. Stored in
-PostgreSQL since week 5, with four sample announcements seeded.
+| Endpoint | Description | Errors |
+|:---|:---|:---|
+| `GET /api/announcements` | List, newest first (`?category=`, `?priority=`, `?search=`) | 400 |
+| `POST /api/announcements` | Create: `title`, `content`, `category`, `priority`, `author` | 400 |
+| `GET` · `PUT` · `PATCH` · `DELETE /api/announcements/:id` | Read, replace, update, delete | 400, 404 |
 
-| Method | Path | Description | Success | Errors |
-| --- | --- | --- | --- | --- |
-| GET | `/api/announcements` | List, newest first; optional `?category=`, `?priority=`, `?search=` | 200 | 400 |
-| POST | `/api/announcements` | Create an announcement | 201 | 400 |
-| GET | `/api/announcements/:id` | Get one announcement | 200 | 404 |
-| PUT | `/api/announcements/:id` | Replace an announcement | 200 | 400, 404 |
-| PATCH | `/api/announcements/:id` | Update some fields | 200 | 400, 404 |
-| DELETE | `/api/announcements/:id` | Delete an announcement | 200 | 404 |
+### Job postings (one-to-many)
 
-| Field | Rules |
-| --- | --- |
-| `title` | required, 3–150 characters |
-| `content` | required, 10–5000 characters |
-| `category` | required: `general`, `academic`, `career`, `event` |
-| `priority` | `low`, `normal` (default), `high` |
-| `author` | required, 2–100 characters (person or office) |
+| Endpoint | Description | Errors |
+|:---|:---|:---|
+| `GET /api/users/:id/jobs` | Jobs posted by the user | 404 |
+| `POST /api/users/:id/jobs` | Post a job as this user — the poster comes **only from the URL** | 400, 404 |
+| `GET /api/jobs` | List, newest first (`?userId=`, `?workMode=`, `?search=`) | 400 |
+| `POST /api/jobs` | Create with the poster as `userId` in the body | 400, 404 |
+| `GET` · `PUT` · `PATCH` · `DELETE /api/jobs/:id` | Read, replace, update, delete (cascades to applications) | 400, 404 |
 
-```bash
-curl -X POST http://localhost:3000/api/announcements \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Career fair on 12 March","content":"More than forty companies will join.","category":"career","priority":"high","author":"Career Center"}'
+### Applications (many-to-many)
 
-curl "http://localhost:3000/api/announcements?category=event&priority=high"
-```
+| Endpoint | Description | Errors |
+|:---|:---|:---|
+| `GET /api/jobs/:id/applications` | Applications received by the job | 404 |
+| `POST /api/jobs/:id/applications` | Apply: `userId`, optional `status`, `coverLetter` | 400, 404, **409** |
+| `GET /api/users/:id/applications` | Applications sent by the user | 404 |
+| `GET /api/applications` | List (`?status=`) | 400 |
+| `POST /api/applications` | Apply with `userId` and `jobPostingId` in the body | 400, 404, **409** |
+| `GET /api/applications/:id` | Get one application | 404 |
+| `PATCH /api/applications/:id` | Change the status: `applied` → `reviewing` → `interview` → `accepted` / `rejected` | 400, 404 |
+| `DELETE /api/applications/:id` | Withdraw the application | 404 |
 
-### Job postings and applications (week 6)
-
-Two related resources:
-
-- **Job postings** belong to the user who posted them (**one-to-many**,
-  `job_postings.user_id`).
-- **Applications** connect users and job postings (**many-to-many** through
-  the `applications` join table, which also stores `status` and an optional
-  `coverLetter`).
-
-Deleting a user deletes their jobs and applications. Deleting a job deletes
-its applications (`ON DELETE CASCADE`). Details are in [ddd.md](ddd.md).
-
-**Nested routes**
-
-| Method | Path | Description | Success | Errors |
-| --- | --- | --- | --- | --- |
-| GET | `/api/users/:id/jobs` | Jobs posted by the user | 200 | 404 |
-| POST | `/api/users/:id/jobs` | Post a job as this user. The poster is taken **only from the URL**; a `userId` in the body is ignored. | 201 | 400, 404 |
-| GET | `/api/users/:id/applications` | Applications sent by the user | 200 | 404 |
-| GET | `/api/jobs/:id/applications` | Applications received by the job | 200 | 404 |
-| POST | `/api/jobs/:id/applications` | Apply: body `{ "userId", "status"?, "coverLetter"? }` | 201 | 400, 404, **409** |
-
-**Top-level routes**
-
-| Method | Path | Description |
-| --- | --- | --- |
-| GET | `/api/jobs` | List jobs, newest first; `?userId=`, `?workMode=`, `?search=` |
-| POST | `/api/jobs` | Create a job; the poster is given as `userId` in the body |
-| GET / PUT / PATCH / DELETE | `/api/jobs/:id` | Read, replace, update or delete a job |
-| GET | `/api/applications` | List applications; `?status=` |
-| POST | `/api/applications` | Apply; body `{ "userId", "jobPostingId", ... }` |
-| GET / DELETE | `/api/applications/:id` | Read or withdraw an application |
-| PATCH | `/api/applications/:id` | Change the status: `{ "status": "interview" }` |
-
-**One application per user per job.** A second application by the same user
-to the same job returns `409 Conflict` with exactly this body:
+A second application by the same user to the same job returns exactly:
 
 ```json
 { "error": "Conflict", "message": "User has already applied for this job posting" }
 ```
 
-The service checks for an existing pair first. The
-`UNIQUE (user_id, job_posting_id)` constraint covers two requests arriving
-at the same time.
-
-| Job field | Rules |
-| --- | --- |
-| `title`, `company` | required, 2–150 characters |
-| `location` | optional, up to 120 characters |
-| `workMode` | `onsite` (default), `hybrid`, `remote` |
-| `employmentType` | `full_time` (default), `part_time`, `internship`, `contract` |
-| `description` | optional, up to 5000 characters |
-
-| Application field | Rules |
-| --- | --- |
-| `status` | `applied` (default), `reviewing`, `interview`, `accepted`, `rejected` |
-| `coverLetter` | optional, up to 2000 characters |
+### Examples
 
 ```bash
-# Elif posts a job (the poster comes from the URL)
+# create a user
+curl -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Zeynep Arslan","email":"zeynep@alumni.example.edu","graduationYear":2021}'
+
+# Elif posts a job (poster taken from the URL)
 curl -X POST http://localhost:3000/api/users/6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e01/jobs \
   -H "Content-Type: application/json" \
   -d '{"title":"QA Engineer","company":"Galata Software","workMode":"remote"}'
 
-# Mert applies to it; running this twice returns 409
+# Mert applies — sending the same request twice returns 409
 curl -X POST http://localhost:3000/api/jobs/<jobId>/applications \
   -H "Content-Type: application/json" \
   -d '{"userId":"6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e02","coverLetter":"Final-year student, keen on testing."}'
 ```
 
-Sample job postings and applications are created by the **seed factories**
-(`backend/src/db/factories`) on start.
-
-**Pages (week 6 homework).** `/jobs` and `/applications` use the API above.
-Posting a job sends `POST /api/jobs`. Applying from a job card or the job
-page sends the nested `POST /api/jobs/:id/applications`. A duplicate
-application shows the 409 message ("User has already applied for this job
-posting") inside the form. Changing a status sends
-`PATCH /api/applications/:id`. As on the other pages, every action also works
-without JavaScript through plain form posts:
-
-- `POST /jobs`
-- `POST /jobs/:id/apply`
-- `POST /jobs/:id/delete`
-- `POST /applications`
-- `POST /applications/:id/status`
-- `POST /applications/:id/delete`
-
-### Swagger
-
-- Swagger UI: http://localhost:3000/api/docs
-- Raw OpenAPI document: http://localhost:3000/api/openapi.json
-
 ## Pages
 
-| Path | Description |
-| --- | --- |
-| `/` | Redirects to `/home` |
-| `/home` | Landing page with the endpoint list |
-| `/about` | Tech stack and request flow |
-| `/users` | User directory: stats, search, role filter, create / edit / delete |
-| `/users/:id` | User detail page |
-| `/announcements` | Notice board: stats, search, category / priority filters, create / edit / delete |
-| `/announcements/:id` | Announcement detail page |
-| `/jobs` | Job board: stats, search, work-mode / type filters, **post a job**, **apply** from each card, delete |
-| `/jobs/:id` | Job detail with its applications and an apply form |
-| `/applications` | Application tracking: stats per status, search, status filter, new application, **change status**, withdraw |
+| Page | Description |
+|:---|:---|
+| `/home` · `/about` | Landing page with the endpoint list · tech stack and request flow |
+| `/users` · `/users/:id` | Directory with role statistics, search, role filter, create / edit / delete; profile page |
+| `/announcements` · `/announcements/:id` | Card board with category / priority filters and badges; detail page |
+| `/jobs` · `/jobs/:id` | Job board with work-mode / type filters, post and apply dialogs; job page with its applications |
+| `/applications` | Tracking table with per-status statistics, status changes and withdraw |
+
+<p align="center">
+  <img src="assets/users.png" alt="Users page" width="400">
+  <img src="assets/announcements.png" alt="Announcements page" width="400">
+  <img src="assets/applications.png" alt="Applications page" width="400">
+</p>
+
+The lists are rendered on the server, so every page works with JavaScript turned off: forms post to the page routes, and the controller redirects back with `?status=...` or `?error=...` (redirect-after-post). With JavaScript on, `public/js/app.js` adds the following on top, driven only by `data-*` attributes:
+
+- forms open in `<dialog>` windows and are sent to the JSON API
+- rows and cards are filtered while you type
+- errors such as the 409 message are shown inside the form
 
 ## Database
 
-PostgreSQL 16 stores all data. The full design (tables, constraints,
-indexes, ER diagram, migration and seed strategy) is in the
-**[Data Design Document (ddd.md)](ddd.md)**.
+PostgreSQL 16 stores all data. The full design is in the **[Data Design Document (ddd.md)](ddd.md)**: tables, constraints, indexes, cascade rules, ER diagram, and the migration and seed strategy.
 
-Summary:
+| Table | Key points |
+|:---|:---|
+| `users` | UUID key, case-insensitive unique `email`, `role` check, `updated_at` trigger |
+| `announcements` | Category / priority checks, content length check, indexed by `created_at DESC` |
+| `job_postings` | `user_id` → `users` (**1:N**, cascade), work mode / employment type checks |
+| `applications` | `user_id` → `users`, `job_posting_id` → `job_postings` (**N:M join**, cascade), `UNIQUE (user_id, job_posting_id)` |
 
-- `users` and `announcements` tables with UUID keys, `CHECK` constraints for
-  the allowed values, a case-insensitive unique index on `email`, and
-  `updated_at` triggers.
-- `job_postings` (one-to-many from users) and `applications` (many-to-many
-  join table) with foreign keys, `ON DELETE CASCADE`, and a
-  `UNIQUE (user_id, job_posting_id)` rule.
-- Plain SQL migrations in `backend/src/db/migrations`, applied in order and
-  recorded in `schema_migrations`. Each file runs in its own transaction.
-- Idempotent seed files in `backend/src/db/seeds` (`ON CONFLICT DO NOTHING`).
-- Docker named volume `pgdata` for persistence. A `pg_isready` healthcheck
-  plus `depends_on: service_healthy` make the API wait for the database.
+| Migration | Content |
+|:---|:---|
+| `001_create_users_and_announcements.sql` | `set_updated_at()` trigger function, users, announcements |
+| `002_create_job_postings_and_applications.sql` | job_postings, applications, foreign keys, cascades, indexes |
+
+Sample data comes from `db/seeds/*.sql` (users, announcements) and from the **factories** in `db/factories/` (job postings, applications). The factories also provide `build()` / `create()` helpers for the tests. All seeding is idempotent (`ON CONFLICT DO NOTHING`).
 
 ## Testing
 
 ```bash
-docker compose up -d db     # the tests need a PostgreSQL server
+docker compose up -d db        # the tests need a PostgreSQL server
 cd backend
 npm test
 ```
 
-The tests use Node's built-in test runner and Supertest against the Express
-app. They run against a **separate database** (`alumni_tracking_test`, created
-automatically if the user is allowed to), which is migrated once and then
-truncated and re-seeded before each test. Test files run one at a time
-because they share that database.
+The tests run against a **separate database** (`alumni_tracking_test`, created automatically when the user is allowed to). It is migrated once, then truncated and re-seeded before each test. Test files run one at a time because they share it.
+
+| Suite | Tests | Covers |
+|:---|:---:|:---|
+| `system.test.js` | 19 | Health, hello, sum, pages, static files, Swagger, 404 handling |
+| `users.api.test.js` | 20 | User CRUD, filters, validation, malformed JSON, 409 on duplicate email |
+| `user.model.test.js` | 11 | SQL model, row mapping, trigger, unique index |
+| `users.web.test.js` | 10 | Pages, escaping, form fallbacks |
+| `announcements.api.test.js` | 16 | Announcement CRUD, filters, validation |
+| `announcements.web.test.js` | 10 | Model, board and detail pages, form fallbacks |
+| `jobs.api.test.js` | 14 | Factory, nested routes, path-only poster, cascade from users |
+| `jobs.web.test.js` | 8 | Job board, detail page, post / apply / delete forms |
+| `applications.api.test.js` | 11 | Apply, 409 body, concurrent duplicate requests, status changes, cascades |
+| `applications.web.test.js` | 5 | Tracking page, form fallbacks, duplicate message |
+| **Total** | **124** | |
+
+## Project Structure
+
+```
+alumni_tracking/
+├── docker-compose.yml                # db (PostgreSQL 16) + api, pgdata volume, healthcheck
+├── .env.example                      # every setting with its default
+├── ddd.md                            # data design document
+├── assets/                           # README screenshots
+└── backend/
+    ├── Dockerfile                    # two-stage node:22-alpine image, runs as non-root "node"
+    ├── package.json
+    ├── public/
+    │   ├── css/main.css              # burgundy / off-white theme, square corners
+    │   └── js/app.js                 # dialogs, API form submits, live filters
+    ├── src/
+    │   ├── index.js                  # migrate → seed → listen, graceful shutdown
+    │   ├── app.js                    # Express app: Helmet, CORS, Morgan, parsers, routes
+    │   ├── config/index.js           # environment settings
+    │   ├── controllers/
+    │   │   ├── api/                  # system, user, announcement, job, application (JSON)
+    │   │   └── web/                  # page, user, announcement, job, application (HTML)
+    │   ├── db/
+    │   │   ├── pool.js               # pg connection pool + ping
+    │   │   ├── migrate.js            # migration runner (schema_migrations, advisory lock)
+    │   │   ├── seed.js               # SQL seeds, then factories
+    │   │   ├── migrations/           # 001_..., 002_...
+    │   │   ├── seeds/                # sample users and announcements
+    │   │   └── factories/            # job posting and application factories
+    │   ├── docs/openapi.js           # OpenAPI 3.0 document
+    │   ├── lib/                      # HttpError, JSON replies, validator, SQL + form helpers
+    │   ├── middleware/               # 404 and error handlers
+    │   ├── models/                   # user, announcement, job-posting, application
+    │   ├── routes/
+    │   │   ├── api/                  # /api/* and the JSON utility endpoints
+    │   │   └── web/                  # browser pages
+    │   ├── services/                 # validation and business rules
+    │   └── views/                    # partials/, users/, announcements/, jobs/, applications/
+    └── tests/                        # node:test + Supertest suites, helpers/database.js
+```
 
 ## Configuration
 
+Every value is optional. Docker Compose and the app fall back to the defaults below. Copy `.env.example` to `.env` in the repository root to change them.
+
 | Variable | Default | Description |
-| --- | --- | --- |
+|:---|:---|:---|
 | `NODE_ENV` | `development` (`production` in Docker) | Runtime mode |
 | `PORT` | `3000` | Port the API listens on |
 | `HOST` | `0.0.0.0` | Interface to bind |
@@ -430,13 +340,18 @@ because they share that database.
 | `TEST_DB_NAME` | `alumni_tracking_test` | Database used by `npm test` |
 | `SEED_ON_START` | `true` | Load the sample data on every start |
 
-## Weekly progress
+## Weekly Progress
 
-| Week | Work |
-| --- | --- |
-| 1–3 | Express setup, health / hello / sum endpoints, home & about pages, Docker Compose, in-memory user CRUD, Swagger docs |
-| 4 (in class) | MVC refactor: `UserModel`, separate API and web controllers, `/users` management page |
-| 4 (homework) | Announcements: `AnnouncementModel`, API + web controllers, `/announcements` board |
-| 5 | PostgreSQL persistence: models on SQL, migrations, seeds, `pgdata` volume, [ddd.md](ddd.md) |
-| 6 (in class) | Relational schema: job postings (1:N) and applications (N:M), nested routes, 409 on duplicate application, factory seeding |
-| 6 (homework) | Pages for job postings and applications: post, apply (with 409 feedback), status changes, withdraw |
+- [x] **Weeks 1–3** — Express setup, health / hello / sum endpoints, home and about pages, Docker Compose, in-memory user CRUD, Swagger docs
+- [x] **Week 4 (in class)** — MVC refactor: `UserModel`, separate API and web controllers, `/users` page
+- [x] **Week 4 (homework)** — Announcements with the same MVC pattern and an `/announcements` board
+- [x] **Week 5** — PostgreSQL persistence, SQL migrations, seeds, `pgdata` volume, [ddd.md](ddd.md)
+- [x] **Week 6 (in class)** — Job postings (1:N) and applications (N:M), nested routes, 409 on duplicate application, factory seeding
+- [x] **Week 6 (homework)** — Pages for job postings and applications
+- [x] Plain JSON responses, burgundy / off-white redesign, dependency audit clean
+
+---
+
+<p align="center">
+  <sub>Built as course work — from an in-memory API to a relational, tested, one-command stack.</sub>
+</p>

@@ -1,6 +1,6 @@
 {
   "name": "alumni-tracking-backend",
-  "version": "0.3.0",
+  "version": "0.6.0",
   "private": true,
   "description": "REST API and web interface for the Alumni Tracking System course project",
   "main": "src/index.js",
