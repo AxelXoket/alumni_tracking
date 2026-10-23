@@ -1,0 +1,55 @@
+<%- include('partials/header') %>
+<section class="hero">
+  <p class="eyebrow">Course project</p>
+  <h1>Keep in touch with every graduate.</h1>
+  <p class="lead">
+    The Alumni Tracking System keeps alumni, students and faculty in one place and exposes
+    everything through a documented REST API.
+  </p>
+  <div class="hero__actions">
+    <a class="btn btn--primary" href="/api/docs">Open API docs</a>
+    <a class="btn" href="/api/users">Browse users JSON</a>
+  </div>
+</section>
+
+<section class="grid grid--3">
+  <article class="card">
+    <h2 class="card__title">Layered backend</h2>
+    <p class="muted">Routes, controllers, services and storage are kept apart, so each layer has one job.</p>
+  </article>
+  <article class="card">
+    <h2 class="card__title">Validated input</h2>
+    <p class="muted">Every write is validated and returns clear 400 / 404 / 409 errors in one JSON format.</p>
+  </article>
+  <article class="card">
+    <h2 class="card__title">One command</h2>
+    <p class="muted">The whole stack starts with <code>docker compose up --build</code>.</p>
+  </article>
+</section>
+
+<section class="card">
+  <h2 class="card__title">Endpoints</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <% endpoints.forEach((endpoint) => { %>
+        <tr>
+          <td><span class="method method--<%= endpoint.method.toLowerCase() %>"><%= endpoint.method %></span></td>
+          <td>
+            <% if (endpoint.example || (endpoint.method === 'GET' && !endpoint.path.includes(':'))) { %>
+              <a href="<%= endpoint.example || endpoint.path %>"><code><%= endpoint.path %></code></a>
+            <% } else { %>
+              <code><%= endpoint.path %></code>
+            <% } %>
+          </td>
+          <td><%= endpoint.description %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<%- include('partials/footer') %>

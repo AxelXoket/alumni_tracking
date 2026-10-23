@@ -1,0 +1,42 @@
+name: alumni-tracking
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: alumni-tracking-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-alumni_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-alumni_app_pw}
+      POSTGRES_DB: ${DB_NAME:-alumni_tracking}
+    ports:
+      - "${DB_EXTERNAL_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    container_name: alumni-tracking-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      APP_NAME: ${APP_NAME:-Alumni Tracking System}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-alumni_app}
+      DB_PASSWORD: ${DB_PASSWORD:-alumni_app_pw}
+      DB_NAME: ${DB_NAME:-alumni_tracking}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  pgdata:

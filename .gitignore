@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# environment files (only the example is committed)
+.env
+.env.local
+.env.*.local
+
+# logs and coverage
+*.log
+npm-debug.log*
+coverage/
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

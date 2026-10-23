@@ -1,0 +1,8 @@
+<%- include('partials/header') %>
+<section class="empty-state">
+  <p class="empty-state__code"><%= status %></p>
+  <h1><%= status === 404 ? 'Page not found' : 'Something went wrong' %></h1>
+  <p class="muted"><%= message %></p>
+  <a class="btn btn--primary" href="/home">Back to home</a>
+</section>
+<%- include('partials/footer') %>

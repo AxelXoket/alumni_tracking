@@ -1,0 +1,34 @@
+<%- include('partials/header') %>
+<section class="page-head">
+  <div>
+    <p class="eyebrow">About</p>
+    <h1><%= appName %></h1>
+    <p class="muted">A course project that tracks graduates, students and faculty of the department.</p>
+  </div>
+</section>
+
+<section class="grid grid--2">
+  <article class="card">
+    <h2 class="card__title">Technology</h2>
+    <dl class="facts">
+      <dt>Runtime</dt><dd>Node.js <%= nodeVersion %></dd>
+      <dt>Framework</dt><dd>Express 5</dd>
+      <dt>Views</dt><dd>EJS templates + plain CSS/JS</dd>
+      <dt>Docs</dt><dd>OpenAPI 3 / Swagger UI</dd>
+      <dt>Security</dt><dd>Helmet headers, CORS</dd>
+      <dt>Container</dt><dd>Docker + Docker Compose</dd>
+      <dt>Environment</dt><dd><%= environment %></dd>
+    </dl>
+  </article>
+  <article class="card">
+    <h2 class="card__title">How a request flows</h2>
+    <ol class="steps">
+      <li><strong>Route</strong> matches the URL and picks a controller.</li>
+      <li><strong>Controller</strong> reads params/body and calls the service.</li>
+      <li><strong>Service</strong> validates input and applies the business rules.</li>
+      <li><strong>Storage</strong> keeps the records and returns copies.</li>
+      <li>The response goes back in a single <code>{ success, data }</code> format.</li>
+    </ol>
+  </article>
+</section>
+<%- include('partials/footer') %>

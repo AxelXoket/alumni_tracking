@@ -1,0 +1,12 @@
+  </main>
+  <footer class="footer">
+    <div class="container footer__inner">
+      <span><%= appName %> · Course project</span>
+      <span><a href="/api/health">Health</a> · <a href="/api/docs">Swagger</a></span>
+    </div>
+  </footer>
+  <% if (typeof scripts !== 'undefined') { scripts.forEach((src) => { %>
+  <script src="<%= src %>" defer></script>
+  <% }) } %>
+</body>
+</html>
