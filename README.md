@@ -24,7 +24,7 @@ command.
 | --- | --- |
 | Runtime | Node.js 22 (works on 20+) |
 | Web framework | Express 5 |
-| Views | EJS templates, plain CSS and JavaScript |
+| Views | EJS templates, plain CSS and JavaScript (burgundy / off-white theme, square corners) |
 | API docs | OpenAPI 3.0 + Swagger UI |
 | Database | PostgreSQL 16 (container), `pg` driver, SQL migrations |
 | Security | Helmet, CORS |
