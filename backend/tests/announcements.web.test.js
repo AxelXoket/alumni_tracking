@@ -1,34 +1,45 @@
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, before, beforeEach, after } = require('node:test');
+const { prepareDatabase, resetDatabase, closeDatabase } = require('./helpers/database');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const createApp = require('../src/app');
-const { AnnouncementModel, announcementModel } = require('../src/models/announcement.model');
+const { announcementModel } = require('../src/models/announcement.model');
 
 const app = createApp();
 const SEEDED_ID = '3c9b7e10-5a2f-4d8e-b1c4-7e2a9f0d5b01';
 
-beforeEach(() => announcementModel.reset());
+before(prepareDatabase);
+beforeEach(resetDatabase);
+after(closeDatabase);
 
-describe('AnnouncementModel (in memory)', () => {
-  it('loads the sample announcements and counts them per category', async () => {
-    const model = new AnnouncementModel();
-    assert.equal(await model.count(), 4);
-    assert.deepEqual(await model.countByCategory(), { general: 1, academic: 1, career: 1, event: 1 });
+describe('AnnouncementModel (PostgreSQL)', () => {
+  it('reads the seeded announcements and counts them per category', async () => {
+    assert.equal(await announcementModel.count(), 4);
+    assert.deepEqual(await announcementModel.countByCategory(), { general: 1, academic: 1, career: 1, event: 1 });
   });
 
-  it('creates, updates and deletes records without leaking references', async () => {
-    const model = new AnnouncementModel();
-    const created = await model.create({ title: 'T', content: 'C', category: 'general', author: 'A' });
+  it('creates, updates and deletes rows', async () => {
+    const created = await announcementModel.create({
+      title: 'Test notice',
+      content: 'Created by the model test.',
+      category: 'general',
+      author: 'Tester',
+    });
     assert.equal(created.priority, 'normal');
-    created.title = 'mutated';
-    assert.equal((await model.findById(created.id)).title, 'T');
 
-    const updated = await model.update(created.id, { priority: 'high', createdAt: 'nope' });
+    const updated = await announcementModel.update(created.id, { priority: 'high' });
     assert.equal(updated.priority, 'high');
     assert.equal(updated.createdAt, created.createdAt);
 
-    assert.equal(await model.delete(created.id), true);
-    assert.equal(await model.findById(created.id), null);
+    assert.equal(await announcementModel.delete(created.id), true);
+    assert.equal(await announcementModel.findById(created.id), null);
+  });
+
+  it('rejects values outside the CHECK constraints', async () => {
+    await assert.rejects(
+      announcementModel.create({ title: 'Bad', content: 'Category is not allowed.', category: 'sports', author: 'X' }),
+      (err) => err.code === '23514',
+    );
   });
 });
 

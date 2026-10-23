@@ -1,8 +1,8 @@
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, before, beforeEach, after } = require('node:test');
+const { prepareDatabase, resetDatabase, closeDatabase } = require('./helpers/database');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const createApp = require('../src/app');
-const { announcementModel } = require('../src/models/announcement.model');
 
 const app = createApp();
 const SEEDED_ID = '3c9b7e10-5a2f-4d8e-b1c4-7e2a9f0d5b01';
@@ -17,7 +17,9 @@ const payload = (overrides = {}) => ({
   ...overrides,
 });
 
-beforeEach(() => announcementModel.reset());
+before(prepareDatabase);
+beforeEach(resetDatabase);
+after(closeDatabase);
 
 describe('GET /api/announcements', () => {
   it('lists announcements, newest first', async () => {

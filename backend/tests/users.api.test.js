@@ -1,8 +1,8 @@
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, before, beforeEach, after } = require('node:test');
+const { prepareDatabase, resetDatabase, closeDatabase } = require('./helpers/database');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const createApp = require('../src/app');
-const { userModel } = require('../src/models/user.model');
 
 const app = createApp();
 const SEEDED_ID = '6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e01';
@@ -17,7 +17,9 @@ const newUser = (overrides = {}) => ({
   ...overrides,
 });
 
-beforeEach(() => userModel.reset());
+before(prepareDatabase);
+beforeEach(resetDatabase);
+after(closeDatabase);
 
 describe('GET /api/users', () => {
   it('lists the seeded users with a count', async () => {

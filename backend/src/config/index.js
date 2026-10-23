@@ -20,6 +20,8 @@ module.exports = Object.freeze({
   appName: process.env.APP_NAME || 'Alumni Tracking System',
   host: process.env.HOST || '0.0.0.0',
   port: toPort(process.env.PORT, 3000),
+  // load the idempotent sample data on every start (set to "false" to skip)
+  seedOnStart: process.env.SEED_ON_START !== 'false',
   db: Object.freeze({
     host: process.env.DB_HOST || 'localhost',
     port: toPort(process.env.DB_PORT, 5432),

@@ -13,6 +13,7 @@ command.
 - [Architecture (MVC)](#architecture-mvc)
 - [API](#api)
 - [Pages](#pages)
+- [Database](#database)
 - [Testing](#testing)
 - [Configuration](#configuration)
 - [Weekly progress](#weekly-progress)
@@ -25,7 +26,7 @@ command.
 | Web framework | Express 5 |
 | Views | EJS templates, plain CSS and JavaScript |
 | API docs | OpenAPI 3.0 + Swagger UI |
-| Database | PostgreSQL 16 (container) |
+| Database | PostgreSQL 16 (container), `pg` driver, SQL migrations |
 | Security | Helmet, CORS |
 | Tests | `node:test` + Supertest |
 | Containers | Docker, Docker Compose |
@@ -39,8 +40,12 @@ docker compose up --build
 ```
 
 That is the only command needed. Compose starts PostgreSQL, waits until it is
-healthy, then builds and starts the API. No `.env` file is required; the
+healthy, then builds and starts the API. On start the API applies any pending
+database migrations and loads the sample data. No `.env` file is required; the
 defaults are listed in [`.env.example`](.env.example).
+
+Data is stored in the named volume `pgdata`, so it survives restarts and
+rebuilds.
 
 | URL | What it is |
 | --- | --- |
@@ -52,7 +57,7 @@ defaults are listed in [`.env.example`](.env.example).
 | http://localhost:3000/api/health | Health check |
 | http://localhost:3000/api/users | Users API |
 
-Stop the stack with `docker compose down` (add `-v` to also delete the database volume).
+Stop the stack with `docker compose down`. Add `-v` to also delete the database volume.
 
 ### Without Docker
 
@@ -62,17 +67,31 @@ npm install
 npm run dev        # restarts on file changes
 ```
 
+The API needs a PostgreSQL database. The easiest option is the one from Compose:
+
+```bash
+docker compose up -d db     # PostgreSQL only, published on localhost:5432
+cd backend && npm run dev
+```
+
 Copy `.env.example` to `.env` in the repository root if you want to change any
-setting. The users API keeps its data in memory this week, so the database is
-optional when running locally; `/api/health` reports `degraded` if it cannot
-reach PostgreSQL.
+setting.
+
+| Script | What it does |
+| --- | --- |
+| `npm start` | migrate, seed, start the server |
+| `npm run dev` | same, restarting on file changes |
+| `npm run migrate` | apply pending migrations only |
+| `npm run seed` | load the sample data only (idempotent) |
+| `npm test` | run the test suite against the test database |
 
 ## Project structure
 
 ```text
 .
-├── docker-compose.yml        # db (PostgreSQL 16) + api services
+├── docker-compose.yml        # db (PostgreSQL 16) + api services, pgdata volume
 ├── .env.example              # every supported setting with its default
+├── ddd.md                    # data design document
 └── backend/
     ├── Dockerfile            # two-stage node:22-alpine image, runs as "node"
     ├── package.json
@@ -86,11 +105,16 @@ reach PostgreSQL.
     │   ├── controllers/
     │   │   ├── api/          # JSON controllers  (/api/...)
     │   │   └── web/          # page controllers  (/users, /home, ...)
-    │   ├── db/pool.js        # PostgreSQL connection pool + ping
+    │   ├── db/
+    │   │   ├── pool.js       # PostgreSQL connection pool + ping
+    │   │   ├── migrate.js    # migration runner (schema_migrations table)
+    │   │   ├── seed.js       # loads the seed files
+    │   │   ├── migrations/   # 001_create_users_and_announcements.sql, ...
+    │   │   └── seeds/        # idempotent sample data
     │   ├── docs/openapi.js   # OpenAPI 3 document
     │   ├── lib/              # HttpError, response envelope, validator, form helpers
     │   ├── middleware/       # 404 and error handlers
-    │   ├── models/           # data models (in memory for now)
+    │   ├── models/           # data models (PostgreSQL)
     │   ├── routes/
     │   │   ├── api/          # /api/* and the JSON utility endpoints
     │   │   └── web/          # browser pages
@@ -118,12 +142,12 @@ live in one place.
                  (validation, unique email → 409)
                                 │
                       models/user.model (UserModel)
-                         in-memory records
+                        PostgreSQL `users` table
 ```
 
 | Layer | File | Responsibility |
 | --- | --- | --- |
-| Model | `models/user.model.js` | `UserModel`: `findAll`, `findById`, `findByEmail`, `create`, `update`, `delete`, `count`, `countByRole`, `reset`. Keeps records in memory (no database yet, as the brief requires) and always returns copies. Methods are async so a database can replace the Map later without touching callers. |
+| Model | `models/user.model.js` | `UserModel`: `findAll`, `findById`, `findByEmail`, `create`, `update`, `delete`, `count`, `countByRole`. In week 4 it kept records in memory; since week 5 it runs parameterized SQL against the `users` table. The interface stayed the same, so nothing above the model changed. |
 | View | `views/users/index.ejs`, `views/users/show.ejs` | User list with stats, search, role filter, create/edit/delete dialogs; detail page. Shared layout in `views/partials`. |
 | Controller (API) | `controllers/api/user.controller.js` | `/api/users` CRUD, JSON only. |
 | Controller (web) | `controllers/web/user.controller.js` | Renders the pages and handles plain HTML form posts (`POST /users`, `POST /users/:id/edit`, `POST /users/:id/delete`) with redirect-after-post. |
@@ -168,11 +192,10 @@ curl http://localhost:3000/sum/15/27
 # {"success":true,"data":{"operation":"sum","number1":15,"number2":27,"result":42}}
 ```
 
-### Users (in memory)
+### Users
 
-The week 3 brief asks for user CRUD **without a database**, so users are kept in
-memory and reset whenever the server restarts. Four sample users are loaded at
-startup.
+In weeks 3–4 users were kept in memory, as the brief required. Since week 5
+they are stored in PostgreSQL. Four sample users are seeded on the first start.
 
 | Method | Path | Description | Success | Errors |
 | --- | --- | --- | --- | --- |
@@ -205,11 +228,11 @@ curl -X PATCH http://localhost:3000/api/users/<id> \
 curl -X DELETE http://localhost:3000/api/users/<id>
 ```
 
-### Announcements (in memory)
+### Announcements
 
 A notice board for graduates and students, built with the same MVC pattern as
-users (model, service, API controller, web controller, views). Four sample
-announcements are loaded at startup.
+users: model, service, API controller, web controller and views. Stored in
+PostgreSQL since week 5, with four sample announcements seeded.
 
 | Method | Path | Description | Success | Errors |
 | --- | --- | --- | --- | --- |
@@ -253,15 +276,36 @@ curl "http://localhost:3000/api/announcements?category=event&priority=high"
 | `/announcements` | Notice board: stats, search, category / priority filters, create / edit / delete |
 | `/announcements/:id` | Announcement detail page |
 
+## Database
+
+PostgreSQL 16 stores all data. The full design (tables, constraints,
+indexes, ER diagram, migration and seed strategy) is in the
+**[Data Design Document (ddd.md)](ddd.md)**.
+
+Summary:
+
+- `users` and `announcements` tables with UUID keys, `CHECK` constraints for
+  the allowed values, a case-insensitive unique index on `email`, and
+  `updated_at` triggers.
+- Plain SQL migrations in `backend/src/db/migrations`, applied in order and
+  recorded in `schema_migrations`. Each file runs in its own transaction.
+- Idempotent seed files in `backend/src/db/seeds` (`ON CONFLICT DO NOTHING`).
+- Docker named volume `pgdata` for persistence. A `pg_isready` healthcheck
+  plus `depends_on: service_healthy` make the API wait for the database.
+
 ## Testing
 
 ```bash
+docker compose up -d db     # the tests need a PostgreSQL server
 cd backend
 npm test
 ```
 
-The tests use Node's built-in test runner and Supertest against the Express app
-directly, so no server or database has to be running.
+The tests use Node's built-in test runner and Supertest against the Express
+app. They run against a **separate database** (`alumni_tracking_test`, created
+automatically if the user is allowed to), which is migrated once and then
+truncated and re-seeded before each test. Test files run one at a time
+because they share that database.
 
 ## Configuration
 
@@ -278,6 +322,8 @@ directly, so no server or database has to be running.
 | `DB_PASSWORD` | `alumni_app_pw` | PostgreSQL password |
 | `DB_NAME` | `alumni_tracking` | Database name |
 | `DB_EXTERNAL_PORT` | `5432` | Host port published for PostgreSQL |
+| `TEST_DB_NAME` | `alumni_tracking_test` | Database used by `npm test` |
+| `SEED_ON_START` | `true` | Load the sample data on every start |
 
 ## Weekly progress
 
@@ -286,3 +332,4 @@ directly, so no server or database has to be running.
 | 1–3 | Express setup, health / hello / sum endpoints, home & about pages, Docker Compose, in-memory user CRUD, Swagger docs |
 | 4 (in class) | MVC refactor: `UserModel`, separate API and web controllers, `/users` management page |
 | 4 (homework) | Announcements: `AnnouncementModel`, API + web controllers, `/announcements` board |
+| 5 | PostgreSQL persistence: models on SQL, migrations, seeds, `pgdata` volume, [ddd.md](ddd.md) |

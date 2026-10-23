@@ -1,75 +1,81 @@
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, before, beforeEach, after } = require('node:test');
+const { prepareDatabase, resetDatabase, closeDatabase } = require('./helpers/database');
 const assert = require('node:assert/strict');
-const { UserModel } = require('../src/models/user.model');
+const { userModel } = require('../src/models/user.model');
 
-describe('UserModel (in memory)', () => {
-  let model;
+const SEEDED_ID = '6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e01';
 
-  beforeEach(() => {
-    model = new UserModel();
-  });
+before(prepareDatabase);
+beforeEach(resetDatabase);
+after(closeDatabase);
 
-  it('starts with the four sample users', async () => {
-    assert.equal(await model.count(), 4);
-    assert.equal((await model.findAll()).length, 4);
+describe('UserModel (PostgreSQL)', () => {
+  it('reads the four seeded users', async () => {
+    assert.equal(await userModel.count(), 4);
+    assert.equal((await userModel.findAll()).length, 4);
   });
 
   it('filters by role and search term', async () => {
-    const students = await model.findAll({ role: 'student' });
+    const students = await userModel.findAll({ role: 'student' });
+    assert.ok(students.length > 0);
     assert.ok(students.every((user) => user.role === 'student'));
-    const found = await model.findAll({ search: 'YILMAZ' });
-    assert.equal(found.length, 1);
+    assert.equal((await userModel.findAll({ search: 'YILMAZ' })).length, 1);
   });
 
-  it('finds by id and returns null for unknown ids', async () => {
-    const [first] = await model.findAll();
-    assert.equal((await model.findById(first.id)).email, first.email);
-    assert.equal(await model.findById('missing'), null);
+  it('treats % and _ in search terms literally', async () => {
+    assert.equal((await userModel.findAll({ search: '%' })).length, 0);
+  });
+
+  it('finds by id and returns null for unknown or malformed ids', async () => {
+    assert.equal((await userModel.findById(SEEDED_ID)).name, 'Elif Yılmaz');
+    assert.equal(await userModel.findById('00000000-0000-4000-8000-000000000000'), null);
+    assert.equal(await userModel.findById('not-a-uuid'), null);
   });
 
   it('finds by email case-insensitively', async () => {
-    const user = await model.findByEmail('ELIF.YILMAZ@alumni.example.edu');
-    assert.equal(user.name, 'Elif Yılmaz');
+    const user = await userModel.findByEmail('ELIF.YILMAZ@alumni.example.edu');
+    assert.equal(user.id, SEEDED_ID);
   });
 
-  it('creates users with id and timestamps', async () => {
-    const user = await model.create({ name: 'Test User', email: 'test@example.edu', role: 'student' });
-    assert.ok(user.id);
-    assert.equal(user.createdAt, user.updatedAt);
-    assert.equal(user.department, null);
-    assert.equal(await model.count(), 5);
+  it('maps rows to camelCase objects with ISO timestamps', async () => {
+    const user = await userModel.findById(SEEDED_ID);
+    assert.deepEqual(Object.keys(user).sort(), [
+      'createdAt', 'department', 'email', 'graduationYear', 'id', 'name', 'role', 'updatedAt',
+    ]);
+    assert.equal(user.graduationYear, 2019);
+    assert.equal(user.createdAt, '2025-09-01T09:00:00.000Z');
   });
 
-  it('updates only the given fields and ignores unknown keys', async () => {
-    const [first] = await model.findAll();
-    const updated = await model.update(first.id, { role: 'admin', id: 'hacked', isRoot: true });
-    assert.equal(updated.id, first.id);
-    assert.equal(updated.role, 'admin');
-    assert.equal(updated.name, first.name);
-    assert.equal('isRoot' in updated, false);
-    assert.equal(await model.update('missing', { role: 'admin' }), null);
+  it('creates users with a generated id and default role', async () => {
+    const user = await userModel.create({ name: 'Test User', email: 'test@example.edu' });
+    assert.match(user.id, /^[0-9a-f-]{36}$/);
+    assert.equal(user.role, 'alumni');
+    assert.equal(await userModel.count(), 5);
+  });
+
+  it('updates the given fields and refreshes updated_at through the trigger', async () => {
+    const before = await userModel.findById(SEEDED_ID);
+    const updated = await userModel.update(SEEDED_ID, { role: 'faculty' });
+    assert.equal(updated.role, 'faculty');
+    assert.equal(updated.name, before.name);
+    assert.ok(updated.updatedAt > before.updatedAt);
+    assert.equal(await userModel.update('not-a-uuid', { role: 'admin' }), null);
   });
 
   it('deletes users', async () => {
-    const [first] = await model.findAll();
-    assert.equal(await model.delete(first.id), true);
-    assert.equal(await model.delete(first.id), false);
-    assert.equal(await model.count(), 3);
-  });
-
-  it('never exposes its internal records', async () => {
-    const [first] = await model.findAll();
-    first.name = 'Changed outside';
-    assert.notEqual((await model.findById(first.id)).name, 'Changed outside');
+    assert.equal(await userModel.delete(SEEDED_ID), true);
+    assert.equal(await userModel.delete(SEEDED_ID), false);
+    assert.equal(await userModel.count(), 3);
   });
 
   it('counts users per role', async () => {
-    assert.deepEqual(await model.countByRole(), { alumni: 1, student: 1, faculty: 1, admin: 1 });
+    assert.deepEqual(await userModel.countByRole(), { alumni: 1, student: 1, faculty: 1, admin: 1 });
   });
 
-  it('reset restores the sample data', async () => {
-    await model.create({ name: 'Temp', email: 'temp@example.edu', role: 'alumni' });
-    await model.reset();
-    assert.equal(await model.count(), 4);
+  it('enforces the unique email index in the database', async () => {
+    await assert.rejects(
+      userModel.create({ name: 'Copy', email: 'Elif.Yilmaz@alumni.example.edu' }),
+      (err) => err.code === '23505',
+    );
   });
 });

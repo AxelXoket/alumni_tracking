@@ -12,6 +12,7 @@ services:
     ports:
       - "${DB_EXTERNAL_PORT:-5432}:5432"
     volumes:
+      # named volume: the data survives `docker compose down` and rebuilds
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -35,6 +36,7 @@ services:
       DB_USER: ${DB_USER:-alumni_app}
       DB_PASSWORD: ${DB_PASSWORD:-alumni_app_pw}
       DB_NAME: ${DB_NAME:-alumni_tracking}
+      SEED_ON_START: ${SEED_ON_START:-true}
     ports:
       - "${APP_PORT:-3000}:3000"
 

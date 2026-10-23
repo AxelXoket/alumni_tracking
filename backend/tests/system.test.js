@@ -1,20 +1,21 @@
-const { describe, it, after } = require('node:test');
+const { describe, it, before, after } = require('node:test');
+const { prepareDatabase, closeDatabase } = require('./helpers/database');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const createApp = require('../src/app');
-const db = require('../src/db/pool');
 
 const app = createApp();
 
-after(() => db.close());
+before(prepareDatabase);
+after(closeDatabase);
 
 describe('health check', () => {
   for (const path of ['/health', '/api/health']) {
     it(`GET ${path} reports the service as healthy`, async () => {
       const res = await request(app).get(path).expect(200);
       assert.equal(res.body.success, true);
-      assert.ok(['ok', 'degraded'].includes(res.body.data.status));
-      assert.equal(typeof res.body.data.database.connected, 'boolean');
+      assert.equal(res.body.data.status, 'ok');
+      assert.equal(res.body.data.database.connected, true);
       assert.equal(typeof res.body.data.uptime.seconds, 'number');
       assert.ok(!Number.isNaN(Date.parse(res.body.data.timestamp)));
     });

@@ -1,136 +1,119 @@
-const { randomUUID } = require('crypto');
+const db = require('../db/pool');
+const { UUID_PATTERN } = require('../lib/validate');
+const { likePattern } = require('../lib/sql');
 
 /**
- * User model (the "M" in MVC).
+ * User model (the "M" in MVC), backed by the PostgreSQL `users` table.
  *
- * Holds user records in memory, as the course brief still asks for no database
- * connection. All methods are async on purpose: controllers and services
- * already await them, so moving the data to PostgreSQL later only changes this
- * file. Every method returns copies, so callers can never mutate stored data.
+ * The public interface is the same as the in-memory version from week 4, so
+ * services and controllers did not change. Rows are mapped from snake_case
+ * columns to the camelCase objects the API returns.
  */
 
-const SEED_USERS = [
-  {
-    id: '6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e01',
-    name: 'Elif Yılmaz',
-    email: 'elif.yilmaz@alumni.example.edu',
-    role: 'alumni',
-    department: 'Computer Engineering',
-    graduationYear: 2019,
-    createdAt: '2025-09-01T09:00:00.000Z',
-    updatedAt: '2025-09-01T09:00:00.000Z',
-  },
-  {
-    id: '6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e02',
-    name: 'Mert Kaya',
-    email: 'mert.kaya@student.example.edu',
-    role: 'student',
-    department: 'Software Engineering',
-    graduationYear: 2027,
-    createdAt: '2025-09-02T10:30:00.000Z',
-    updatedAt: '2025-09-02T10:30:00.000Z',
-  },
-  {
-    id: '6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e03',
-    name: 'Ayşe Demir',
-    email: 'ayse.demir@example.edu',
-    role: 'faculty',
-    department: 'Computer Engineering',
-    graduationYear: null,
-    createdAt: '2025-09-03T08:15:00.000Z',
-    updatedAt: '2025-09-03T08:15:00.000Z',
-  },
-  {
-    id: '6f1c2a8e-3b7d-4c51-9a2e-0d4f8b6c1e04',
-    name: 'Can Öztürk',
-    email: 'can.ozturk@example.edu',
-    role: 'admin',
-    department: 'Alumni Relations Office',
-    graduationYear: null,
-    createdAt: '2025-09-04T12:00:00.000Z',
-    updatedAt: '2025-09-04T12:00:00.000Z',
-  },
-];
+const COLUMNS = 'id, name, email, role, department, graduation_year, created_at, updated_at';
 
-const FIELDS = ['name', 'email', 'role', 'department', 'graduationYear'];
+const FIELD_COLUMNS = {
+  name: 'name',
+  email: 'email',
+  role: 'role',
+  department: 'department',
+  graduationYear: 'graduation_year',
+};
 
-function pick(data) {
-  return Object.fromEntries(FIELDS.filter((key) => key in data).map((key) => [key, data[key]]));
+function toUser(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    department: row.department,
+    graduationYear: row.graduation_year,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  };
 }
 
+// ids that are not UUIDs can never match a row; checking here avoids a
+// PostgreSQL "invalid input syntax for type uuid" error
+const isUuid = (id) => typeof id === 'string' && UUID_PATTERN.test(id);
+
 class UserModel {
-  constructor(seed = SEED_USERS) {
-    this.seed = seed;
-    this.records = new Map();
-    this.loadSeed();
-  }
-
-  loadSeed() {
-    this.records.clear();
-    this.seed.forEach((user) => this.records.set(user.id, { ...user }));
-  }
-
   async findAll({ role, search } = {}) {
-    const term = search ? String(search).trim().toLowerCase() : '';
-    return [...this.records.values()]
-      .filter((user) => !role || user.role === role)
-      .filter((user) => !term || user.name.toLowerCase().includes(term) || user.email.includes(term))
-      .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
-      .map((user) => ({ ...user }));
+    const where = [];
+    const params = [];
+    if (role) {
+      params.push(role);
+      where.push(`role = $${params.length}`);
+    }
+    if (search) {
+      params.push(likePattern(search));
+      where.push(`(name ILIKE $${params.length} OR email ILIKE $${params.length} OR department ILIKE $${params.length})`);
+    }
+    const filter = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const { rows } = await db.getPool().query(`SELECT ${COLUMNS} FROM users ${filter} ORDER BY name`, params);
+    return rows.map(toUser);
   }
 
   async findById(id) {
-    const user = this.records.get(id);
-    return user ? { ...user } : null;
+    if (!isUuid(id)) return null;
+    const { rows } = await db.getPool().query(`SELECT ${COLUMNS} FROM users WHERE id = $1`, [id]);
+    return toUser(rows[0]);
   }
 
   async findByEmail(email) {
-    const target = String(email).toLowerCase();
-    const user = [...this.records.values()].find((record) => record.email === target);
-    return user ? { ...user } : null;
+    const { rows } = await db.getPool().query(`SELECT ${COLUMNS} FROM users WHERE lower(email) = lower($1)`, [email]);
+    return toUser(rows[0]);
   }
 
   async create(data) {
-    const now = new Date().toISOString();
-    const user = {
-      id: randomUUID(),
-      department: null,
-      graduationYear: null,
-      ...pick(data),
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.records.set(user.id, user);
-    return { ...user };
+    const { rows } = await db.getPool().query(
+      `INSERT INTO users (name, email, role, department, graduation_year)
+       VALUES ($1, $2, COALESCE($3, 'alumni'), $4, $5)
+       RETURNING ${COLUMNS}`,
+      [data.name, data.email, data.role ?? null, data.department ?? null, data.graduationYear ?? null],
+    );
+    return toUser(rows[0]);
   }
 
   async update(id, changes) {
-    const current = this.records.get(id);
-    if (!current) return null;
-    const updated = { ...current, ...pick(changes), updatedAt: new Date().toISOString() };
-    this.records.set(id, updated);
-    return { ...updated };
+    if (!isUuid(id)) return null;
+    const sets = [];
+    const params = [];
+    for (const [field, column] of Object.entries(FIELD_COLUMNS)) {
+      if (field in changes) {
+        params.push(changes[field]);
+        sets.push(`${column} = $${params.length}`);
+      }
+    }
+    if (sets.length === 0) return this.findById(id);
+    params.push(id);
+    // updated_at is maintained by the users_set_updated_at trigger
+    const { rows } = await db.getPool().query(
+      `UPDATE users SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING ${COLUMNS}`,
+      params,
+    );
+    return toUser(rows[0]);
   }
 
   async delete(id) {
-    return this.records.delete(id);
+    if (!isUuid(id)) return false;
+    const { rowCount } = await db.getPool().query('DELETE FROM users WHERE id = $1', [id]);
+    return rowCount > 0;
   }
 
   async count() {
-    return this.records.size;
+    const { rows } = await db.getPool().query('SELECT count(*)::int AS total FROM users');
+    return rows[0].total;
   }
 
   async countByRole() {
     const counts = { alumni: 0, student: 0, faculty: 0, admin: 0 };
-    this.records.forEach((user) => {
-      counts[user.role] = (counts[user.role] || 0) + 1;
+    const { rows } = await db.getPool().query('SELECT role, count(*)::int AS total FROM users GROUP BY role');
+    rows.forEach((row) => {
+      counts[row.role] = row.total;
     });
     return counts;
-  }
-
-  /** Restores the sample data; used by the tests. */
-  async reset() {
-    this.loadSeed();
   }
 }
 

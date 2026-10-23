@@ -3,7 +3,8 @@
   <div>
     <p class="eyebrow">About</p>
     <h1><%= appName %></h1>
-    <p class="muted">A course project that tracks graduates, students and faculty of the department.</p>
+    <p class="muted">A course project that tracks graduates, students and faculty of the department.
+      The database design is described in <code>ddd.md</code>.</p>
   </div>
 </section>
 
@@ -14,6 +15,7 @@
       <dt>Runtime</dt><dd>Node.js <%= nodeVersion %></dd>
       <dt>Framework</dt><dd>Express 5</dd>
       <dt>Views</dt><dd>EJS templates + plain CSS/JS</dd>
+      <dt>Database</dt><dd>PostgreSQL 16 with SQL migrations</dd>
       <dt>Docs</dt><dd>OpenAPI 3 / Swagger UI</dd>
       <dt>Security</dt><dd>Helmet headers, CORS</dd>
       <dt>Container</dt><dd>Docker + Docker Compose</dd>
@@ -26,7 +28,7 @@
       <li><strong>Route</strong> matches the URL and picks a controller.</li>
       <li><strong>Controller</strong> reads params/body and calls the service.</li>
       <li><strong>Service</strong> validates input and applies the business rules.</li>
-      <li><strong>Storage</strong> keeps the records and returns copies.</li>
+      <li><strong>Model</strong> runs parameterized SQL against PostgreSQL and maps rows to plain objects.</li>
       <li>The response goes back in a single <code>{ success, data }</code> format.</li>
     </ol>
   </article>
