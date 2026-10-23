@@ -92,6 +92,8 @@ describe('API documentation', () => {
     assert.equal(res.body.openapi, '3.0.3');
     assert.ok(res.body.paths['/api/users']);
     assert.ok(res.body.paths['/api/users/{id}']);
+    assert.ok(res.body.paths['/api/announcements']);
+    assert.ok(res.body.paths['/api/announcements/{id}']);
   });
 
   it('serves Swagger UI', async () => {

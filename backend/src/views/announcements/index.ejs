@@ -1,0 +1,114 @@
+<%- include('../partials/header') %>
+<%
+  const label = (value) => value[0].toUpperCase() + value.slice(1);
+  const formatDate = (iso) => new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const excerpt = (text) => (text.length > 180 ? `${text.slice(0, 177).trimEnd()}…` : text);
+%>
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Notice board</p>
+    <h1>Announcements</h1>
+    <p class="muted">News, events and opportunities shared with graduates and students.</p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn" href="/api/announcements" target="_blank" rel="noopener">JSON API</a>
+    <button type="button" class="btn btn--primary" data-open="announcement-form-dialog" data-mode="create">+ New announcement</button>
+  </div>
+</section>
+
+<%- include('../partials/flash') %>
+
+<section class="grid grid--4" aria-label="Announcement statistics">
+  <div class="card stat"><span class="stat__value"><%= announcements.length %></span><span class="stat__label">Total</span></div>
+  <div class="card stat"><span class="stat__value"><%= counts.event %></span><span class="stat__label">Events</span></div>
+  <div class="card stat"><span class="stat__value"><%= counts.career %></span><span class="stat__label">Career</span></div>
+  <div class="card stat"><span class="stat__value"><%= counts.academic + counts.general %></span><span class="stat__label">Academic &amp; general</span></div>
+</section>
+
+<section class="card">
+  <div class="toolbar">
+    <label class="field field--grow">
+      <span class="visually-hidden">Search announcements</span>
+      <input type="search" class="input" placeholder="Search title, text or author…" data-filter="#announcement-list" data-key="search">
+    </label>
+    <label class="field">
+      <span class="visually-hidden">Filter by category</span>
+      <select class="input" data-filter="#announcement-list" data-key="category">
+        <option value="">All categories</option>
+        <% categories.forEach((category) => { %><option value="<%= category %>"><%= label(category) %></option><% }) %>
+      </select>
+    </label>
+    <label class="field">
+      <span class="visually-hidden">Filter by priority</span>
+      <select class="input" data-filter="#announcement-list" data-key="priority">
+        <option value="">Any priority</option>
+        <% priorities.forEach((priority) => { %><option value="<%= priority %>"><%= label(priority) %></option><% }) %>
+      </select>
+    </label>
+  </div>
+
+  <div class="board" id="announcement-list">
+    <% announcements.forEach((item) => { %>
+    <article class="notice notice--<%= item.priority %>" data-item data-category="<%= item.category %>" data-priority="<%= item.priority %>"
+             data-search="<%= [item.title, item.content, item.author].join(' ').toLowerCase() %>">
+      <div class="notice__tags">
+        <span class="badge badge--<%= item.category %>"><%= item.category %></span>
+        <span class="badge badge--priority-<%= item.priority %>"><%= item.priority %> priority</span>
+      </div>
+      <h2 class="notice__title"><a href="/announcements/<%= item.id %>"><%= item.title %></a></h2>
+      <p class="notice__text"><%= excerpt(item.content) %></p>
+      <footer class="notice__foot">
+        <span class="muted"><%= item.author %> · <%= formatDate(item.createdAt) %></span>
+        <span class="actions">
+          <button type="button" class="btn btn--sm" data-open="announcement-form-dialog" data-mode="edit"
+            data-record="<%= JSON.stringify(item) %>"
+            data-endpoint="/api/announcements/<%= item.id %>" data-action="/announcements/<%= item.id %>/edit">Edit</button>
+          <button type="button" class="btn btn--sm btn--danger-ghost" data-open="delete-dialog"
+            data-record="<%= JSON.stringify({ name: item.title }) %>"
+            data-endpoint="/api/announcements/<%= item.id %>" data-action="/announcements/<%= item.id %>/delete">Delete</button>
+        </span>
+      </footer>
+    </article>
+    <% }) %>
+  </div>
+  <p class="empty" data-empty-for="#announcement-list" <%= announcements.length ? 'hidden' : '' %>>No announcements match your filters.</p>
+</section>
+
+<dialog id="announcement-form-dialog" class="dialog" aria-labelledby="announcement-form-title">
+  <form method="post" action="/announcements" data-endpoint="/api/announcements" data-method="POST" data-success="created"
+        data-edit-method="PUT" data-edit-success="updated" class="dialog__body">
+    <header class="dialog__head">
+      <h2 id="announcement-form-title" data-title-create="New announcement" data-title-edit="Edit announcement">New announcement</h2>
+      <button type="button" class="btn btn--ghost btn--sm" data-close aria-label="Close">&times;</button>
+    </header>
+    <p class="form-error" role="alert" hidden></p>
+    <label class="field"><span>Title *</span>
+      <input class="input" name="title" required minlength="3" maxlength="150">
+    </label>
+    <div class="form-row">
+      <label class="field"><span>Category *</span>
+        <select class="input" name="category" required>
+          <% categories.forEach((category) => { %><option value="<%= category %>"><%= label(category) %></option><% }) %>
+        </select>
+      </label>
+      <label class="field"><span>Priority</span>
+        <select class="input" name="priority">
+          <% priorities.forEach((priority) => { %><option value="<%= priority %>" <%= priority === 'normal' ? 'selected' : '' %>><%= label(priority) %></option><% }) %>
+        </select>
+      </label>
+    </div>
+    <label class="field"><span>Author *</span>
+      <input class="input" name="author" required minlength="2" maxlength="100" placeholder="e.g. Career Center">
+    </label>
+    <label class="field"><span>Content *</span>
+      <textarea class="input" name="content" required minlength="10" maxlength="5000"></textarea>
+    </label>
+    <footer class="dialog__foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn btn--primary">Publish</button>
+    </footer>
+  </form>
+</dialog>
+
+<%- include('../partials/delete-dialog', { entity: 'announcement' }) %>
+<%- include('../partials/footer') %>

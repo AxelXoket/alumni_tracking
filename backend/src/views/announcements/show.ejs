@@ -1,0 +1,22 @@
+<%- include('../partials/header') %>
+<% const formatDateTime = (iso) => new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); %>
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/announcements">Announcements</a> / <span><%= announcement.title %></span></nav>
+
+<article class="card article">
+  <div class="notice__tags">
+    <span class="badge badge--<%= announcement.category %>"><%= announcement.category %></span>
+    <span class="badge badge--priority-<%= announcement.priority %>"><%= announcement.priority %> priority</span>
+  </div>
+  <h1><%= announcement.title %></h1>
+  <p class="muted">Posted by <strong><%= announcement.author %></strong> on <%= formatDateTime(announcement.createdAt) %>
+    <% if (announcement.updatedAt !== announcement.createdAt) { %> · updated <%= formatDateTime(announcement.updatedAt) %><% } %></p>
+  <div class="article__body"><%= announcement.content %></div>
+  <div class="profile__actions">
+    <a class="btn" href="/announcements">Back to board</a>
+    <a class="btn" href="/api/announcements/<%= announcement.id %>" target="_blank" rel="noopener">View JSON</a>
+    <form method="post" action="/announcements/<%= announcement.id %>/delete" class="inline-form" data-confirm="Delete this announcement? This cannot be undone.">
+      <button type="submit" class="btn btn--danger">Delete</button>
+    </form>
+  </div>
+</article>
+<%- include('../partials/footer') %>

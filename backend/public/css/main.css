@@ -221,3 +221,25 @@ textarea.input { min-height: 110px; resize: vertical; }
 .toast.is-leaving { opacity: 0; transform: translateY(8px); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .empty { text-align: center; color: var(--muted); padding: 24px 0 8px; margin: 0; }
+
+/* --- Announcement board ------------------------------------------------ */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.notice { display: flex; flex-direction: column; gap: 10px; padding: 18px; border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.notice--high { border-left-color: var(--danger); }
+.notice--normal { border-left-color: var(--primary); }
+.notice--low { border-left-color: var(--muted); }
+.notice__tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.notice__title { font-size: 1.05rem; margin: 0; }
+.notice__title a { color: var(--text); }
+.notice__text { color: var(--muted); margin: 0; flex: 1; }
+.notice__foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; }
+.article { display: grid; gap: 12px; }
+.article__body { white-space: pre-wrap; line-height: 1.7; }
+
+.badge--general { background: var(--surface-alt); color: var(--muted); }
+.badge--academic { background: var(--info-soft); color: var(--info); }
+.badge--career { background: var(--success-soft); color: var(--success); }
+.badge--event { background: var(--warning-soft); color: var(--warning); }
+.badge--priority-high { background: var(--danger-soft); color: var(--danger); }
+.badge--priority-normal { background: var(--primary-soft); color: var(--primary); }
+.badge--priority-low { background: var(--surface-alt); color: var(--muted); }

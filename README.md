@@ -46,6 +46,7 @@ defaults are listed in [`.env.example`](.env.example).
 | --- | --- |
 | http://localhost:3000/home | Landing page |
 | http://localhost:3000/users | User management page |
+| http://localhost:3000/announcements | Announcement board |
 | http://localhost:3000/about | About page |
 | http://localhost:3000/api/docs | Swagger UI |
 | http://localhost:3000/api/health | Health check |
@@ -127,6 +128,10 @@ live in one place.
 | Controller (API) | `controllers/api/user.controller.js` | `/api/users` CRUD, JSON only. |
 | Controller (web) | `controllers/web/user.controller.js` | Renders the pages and handles plain HTML form posts (`POST /users`, `POST /users/:id/edit`, `POST /users/:id/delete`) with redirect-after-post. |
 | Service | `services/user.service.js` | Validation, filters, unique-email rule. |
+| Model | `models/announcement.model.js` | `AnnouncementModel`, same interface as `UserModel` plus `countByCategory`. |
+| View | `views/announcements/index.ejs`, `views/announcements/show.ejs` | Card board with category / priority badges, search and filters, create / edit / delete dialogs; detail page. |
+| Controllers | `controllers/api/announcement.controller.js`, `controllers/web/announcement.controller.js` | JSON API at `/api/announcements`, pages and form fallbacks at `/announcements`. |
+| Service | `services/announcement.service.js` | Validation of title, content, category, priority and author. |
 
 **How the pages work:** the list is rendered on the server, so it works with
 JavaScript turned off — forms post to `/users` and the controller redirects
@@ -200,6 +205,37 @@ curl -X PATCH http://localhost:3000/api/users/<id> \
 curl -X DELETE http://localhost:3000/api/users/<id>
 ```
 
+### Announcements (in memory)
+
+A notice board for graduates and students, built with the same MVC pattern as
+users (model, service, API controller, web controller, views). Four sample
+announcements are loaded at startup.
+
+| Method | Path | Description | Success | Errors |
+| --- | --- | --- | --- | --- |
+| GET | `/api/announcements` | List, newest first; optional `?category=`, `?priority=`, `?search=` | 200 | 400 |
+| POST | `/api/announcements` | Create an announcement | 201 | 400 |
+| GET | `/api/announcements/:id` | Get one announcement | 200 | 404 |
+| PUT | `/api/announcements/:id` | Replace an announcement | 200 | 400, 404 |
+| PATCH | `/api/announcements/:id` | Update some fields | 200 | 400, 404 |
+| DELETE | `/api/announcements/:id` | Delete an announcement | 200 | 404 |
+
+| Field | Rules |
+| --- | --- |
+| `title` | required, 3–150 characters |
+| `content` | required, 10–5000 characters |
+| `category` | required: `general`, `academic`, `career`, `event` |
+| `priority` | `low`, `normal` (default), `high` |
+| `author` | required, 2–100 characters (person or office) |
+
+```bash
+curl -X POST http://localhost:3000/api/announcements \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Career fair on 12 March","content":"More than forty companies will join.","category":"career","priority":"high","author":"Career Center"}'
+
+curl "http://localhost:3000/api/announcements?category=event&priority=high"
+```
+
 ### Swagger
 
 - Swagger UI: http://localhost:3000/api/docs
@@ -214,6 +250,8 @@ curl -X DELETE http://localhost:3000/api/users/<id>
 | `/about` | Tech stack and request flow |
 | `/users` | User directory: stats, search, role filter, create / edit / delete |
 | `/users/:id` | User detail page |
+| `/announcements` | Notice board: stats, search, category / priority filters, create / edit / delete |
+| `/announcements/:id` | Announcement detail page |
 
 ## Testing
 
@@ -247,3 +285,4 @@ directly, so no server or database has to be running.
 | --- | --- |
 | 1–3 | Express setup, health / hello / sum endpoints, home & about pages, Docker Compose, in-memory user CRUD, Swagger docs |
 | 4 (in class) | MVC refactor: `UserModel`, separate API and web controllers, `/users` management page |
+| 4 (homework) | Announcements: `AnnouncementModel`, API + web controllers, `/announcements` board |

@@ -10,6 +10,12 @@ const ENDPOINTS = [
   { method: 'PUT', path: '/api/users/:id', description: 'Replace a user' },
   { method: 'PATCH', path: '/api/users/:id', description: 'Update some user fields' },
   { method: 'DELETE', path: '/api/users/:id', description: 'Delete a user' },
+  { method: 'GET', path: '/api/announcements', description: 'List announcements (?category=, ?priority=, ?search=)' },
+  { method: 'POST', path: '/api/announcements', description: 'Create an announcement' },
+  { method: 'GET', path: '/api/announcements/:id', description: 'Get a single announcement' },
+  { method: 'PUT', path: '/api/announcements/:id', description: 'Replace an announcement' },
+  { method: 'PATCH', path: '/api/announcements/:id', description: 'Update some announcement fields' },
+  { method: 'DELETE', path: '/api/announcements/:id', description: 'Delete an announcement' },
   { method: 'GET', path: '/api/docs', description: 'Swagger UI', example: '/api/docs' },
 ];
 
